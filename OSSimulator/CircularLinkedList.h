@@ -38,5 +38,6 @@ void delete(node *pointer, int pID);
 void removeFront(node *start);
 void removeBack(node *start);
 node * locate(node *start, int key);
+int size();
 
 #endif 

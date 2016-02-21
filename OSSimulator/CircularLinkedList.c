@@ -7,7 +7,7 @@
 //
 
 #include "CircularLinkedList.h"
-int size = 0;
+int length = 0;
 
 void print(node *start,node *pointer)
 {
@@ -28,7 +28,7 @@ void insertBack(node *start, process *data)
     (addBack->next)->prev = addBack;
     (addBack->next)->next = start;
     start->prev = addBack->next;
-    size++;
+    length++;
 }
 
 void insertFront(node *start, process *data)
@@ -40,7 +40,7 @@ void insertFront(node *start, process *data)
     (addFront->prev)->next = addFront;
     (addFront->prev)->prev = start;
     start->next = addFront->prev;
-    size++;
+    length++;
 }
 
 void sort(node *start)
@@ -73,7 +73,7 @@ void sort(node *start)
 
 void insertSorted(node *start, process *data)
 {
-    if (size == 0) {
+    if (length == 0) {
         insertFront(start, data);
         return;
     }
@@ -90,7 +90,7 @@ void insertSorted(node *start, process *data)
             insert->prev = trail;
             pointer->prev = insert;
             trail->next = insert;
-            size++;
+            length++;
             return;
         }
         if (data->runTime > (pointer->current)->runTime && pointer->next == start)
@@ -101,7 +101,7 @@ void insertSorted(node *start, process *data)
             insert->next = start;
             pointer->next = insert;
             start->prev = insert;
-            size++;
+            length++;
             return;
         }
         trail = pointer;
@@ -141,7 +141,7 @@ node * locate(node *start, int key)
 
 void delete(node *start, int pID)
 {
-    if (size <= 0) {
+    if (length <= 0) {
         printf("List is empty \n\n");
         return;
     }
@@ -159,7 +159,7 @@ void delete(node *start, int pID)
     (pointer->prev)->next = pointer->next;
     (pointer->next)->prev = pointer->prev;
     free(pointer);
-    size--;
+    length--;
     
     return;
 }
@@ -173,7 +173,7 @@ void removeFront(node *start){
         next->prev = start;
         
         free(pointer);
-        size--;
+        length--;
     }
     else
     {
@@ -190,10 +190,14 @@ void removeBack(node *start){
         next->next = start;
         
         free(pointer);
-        size--;
+        length--;
     }
     else
     {
         printf("\nList is Empty\n\n");
     }
+}
+
+int size(){
+    return length;
 }
