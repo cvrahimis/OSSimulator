@@ -20,11 +20,40 @@ typedef struct resources{
     int readyQsize;
     node *startData;
     int startDataSize;
+    node *doneQ;
+    int cpuState;
 }sharedRes;
+
+void *cpu(void *arg){
+    sharedRes *sharedResource = (sharedRes *) arg;
+    process *currentProcess = NULL;
+    while (sharedResource->readyQsize > 0 || sharedResource->startDataSize > 0 || sharedResource->cpuState)
+    {
+        if (!sharedResource->cpuState && sharedResource->readyQsize > 0) {
+            sharedResource->cpuState = 1;
+            currentProcess = locate(sharedResource->readyQstart, (((sharedResource->readyQstart)->next)->current)->pID)->current;
+            int timeEntered = sharedResource->time;
+            currentProcess->timeEnteredCUP = timeEntered;
+            delete(sharedResource->readyQstart, currentProcess->pID);
+            sharedResource->readyQsize--;
+            printf("Running pID: %d \n", currentProcess->pID);
+        }
+        if (currentProcess != NULL && currentProcess->runTime <= (sharedResource->time - currentProcess->timeEnteredCUP)) {
+            currentProcess->timeDone = sharedResource->time;
+            insertBack(sharedResource->doneQ, currentProcess);
+            printf("Added pID: %d to the doneQ \n", currentProcess->pID);
+            //delete(sharedResource->readyQstart, currentProcess->pID);
+            sharedResource->cpuState = 0;
+            currentProcess = NULL;
+        }
+    }
+    
+    pthread_exit(NULL);
+}
 
 void *cpuClock(void *arg){
     sharedRes *sharedResource = (sharedRes *) arg;
-    while (sharedResource->readyQsize != 5 || sharedResource->startDataSize > 0) {
+    while (sharedResource->readyQsize > 0 || sharedResource->startDataSize > 0 || sharedResource->cpuState) {
         pthread_mutex_lock(&lock);
         sharedResource->time++;
         pthread_mutex_unlock(&lock);
@@ -38,13 +67,15 @@ void *cpuClock(void *arg){
 void *addToReadyQ(void *arg){
     sharedRes *sharedResource = (sharedRes *) arg;
     node *initData = sharedResource->startData;
-    while(sharedResource->readyQsize != 5 || sharedResource->startDataSize > 0) {
+    while(sharedResource->readyQsize > 0 || sharedResource->startDataSize > 0) {
         while(initData->next != sharedResource->startData || sharedResource->startDataSize > 0){
             if (initData != sharedResource->startData && (initData->current)->entryTime <= sharedResource->time) {
+                (initData->current)->timeEnteredReadyQ = sharedResource->time;
                 insertBack(sharedResource->readyQstart, initData->current);
+                printf("Added pID: %d to the ReadyQ \n", (initData->current)->pID);
                 sharedResource->readyQsize++;
-                print(sharedResource->readyQstart, (sharedResource->readyQstart)->next);
-                printf("\n=================================\n");
+                //print(sharedResource->readyQstart, (sharedResource->readyQstart)->next);
+                //printf("\n=================================\n");
                 delete(sharedResource->startData, initData->current->pID);
                 sharedResource->startDataSize--;
             }
@@ -53,14 +84,25 @@ void *addToReadyQ(void *arg){
         initData = initData->next;
     }
     
-    print(sharedResource->readyQstart, (sharedResource->readyQstart)->next);
+    //print(sharedResource->readyQstart, (sharedResource->readyQstart)->next);
     pthread_exit(NULL);
+}
+
+void printData(node *doneStart, node *pointer){
+    printf("\n");
+    if(pointer==doneStart)
+    {
+        return;
+    }
+    printf("pid: %d entrytime: %d runtime: %d timeEnteredReadyQ: %d timeEnteredCPU: %d timeComplete: %d \n",(pointer->current)->pID, (pointer->current)->entryTime, (pointer->current)->runTime, (pointer->current)->timeEnteredReadyQ, (pointer->current)->timeEnteredCUP, (pointer->current)->timeDone);
+    printData(doneStart, pointer->next);
 }
 
 int main(int argc, const char * argv[]) {
     int rc;
     pthread_t clockThread;
     pthread_t readyQThread;
+    pthread_t cpuThread;
     char buff[255];
     
     node *start;
@@ -73,10 +115,17 @@ int main(int argc, const char * argv[]) {
     readyQ -> next = readyQ;
     readyQ -> prev = readyQ;
     
+    node *doneQ;
+    doneQ = (node *)malloc(sizeof(node));
+    doneQ -> next = doneQ;
+    doneQ -> prev = doneQ;
+    
     sharedRes *sharedResource = (sharedRes *) malloc(sizeof(sharedRes));
     sharedResource->readyQstart = readyQ;
     sharedResource->time = 0;
     sharedResource->startDataSize = 0;
+    sharedResource->doneQ = doneQ;
+    sharedResource->cpuState = 0;
     
     FILE *fp;
     //Sean you will probably need to change the path based on where you put the project
@@ -124,6 +173,12 @@ int main(int argc, const char * argv[]) {
         printf("ERROR. Return code from thread %d\n", rc);
         exit(-1);
     }
+    rc = pthread_create(&cpuThread, NULL, cpu, (void *)sharedResource);
+    if(rc)
+    {
+        printf("ERROR. Return code from thread %d\n", rc);
+        exit(-1);
+    }
 
     rc = pthread_join(clockThread, NULL);
     if(rc)
@@ -137,7 +192,17 @@ int main(int argc, const char * argv[]) {
         printf("Error, return code from thread_join() is %d\n", rc);
         exit(-1);
     }
+    rc = pthread_join(cpuThread, NULL);
+    if(rc)
+    {
+        printf("Error, return code from thread_join() is %d\n", rc);
+        exit(-1);
+    }
     printf("main completed join with thread clock thread \n");
+    printf("main completed join with thread readyQ thread \n");
+    printf("main completed join with thread cpu thread \n");
+    
+    printData(sharedResource->doneQ, sharedResource->doneQ->next);
     
     int fclose(FILE *fp);
     

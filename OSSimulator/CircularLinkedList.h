@@ -17,6 +17,9 @@ typedef struct Process
     int pID;
     int entryTime;
     int runTime;
+    int timeEnteredReadyQ;
+    int timeEnteredCUP;
+    int timeDone;
     //int memory;
 }process;
 
