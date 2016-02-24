@@ -88,7 +88,60 @@ void *addToReadyQ(void *arg){
     pthread_exit(NULL);
 }
 
-void printData(node *doneStart, node *pointer){
+/**
+ * @param {double} probability - probability of creating a new process, double between 0 and 1
+ * @param {sharedRes *} sharedResource - pointer to the shared resource for the OS
+ * @return {process *} - a new random process or NULL, based on probability
+ */
+process *generateRandomProcess(double probability, int minRunTime, int maxRunTime, sharedRes *sharedResource)
+{
+    srand((unsigned int)time(NULL));
+    double randomValue = (double)rand() / RAND_MAX;
+    if (randomValue >= probability) {
+        process *newProc = (process *)malloc(sizeof(process));
+        //TODO: need to generate pID
+        newProc->pID = 0;
+        newProc->entryTime = sharedResource->time;
+        int runTime = rand() % (maxRunTime - minRunTime) + minRunTime;
+        newProc->runTime = runTime;
+    }
+    return NULL;
+}
+
+void loadProcessesFromFile(char *fileName, node *start, sharedRes *sharedResource) {
+    FILE *fp;
+    char buff[255];
+    fp=fopen(fileName, "r");
+    int i = 0;
+    process *newProc = NULL;
+    while (fscanf(fp, "%s", buff) != EOF) {
+        /*DEBUG*///printf("%d \n", atoi(buff));
+        if (i % 3 == 0)
+        {
+            newProc = (process *) malloc(sizeof(process));
+            /*DEBUG*/   //printf("%d ", atoi(buff));
+            newProc->pID = atoi(buff);
+            /*DEBUG*/   //printf(" pID: %d ", newProc->pID);
+        }
+        else if (i % 3 == 1)
+        {
+            /*DEBUG*/   //printf("%d ", atoi(buff));
+            newProc->entryTime = atoi(buff);
+            /*DEBUG*/   //printf("entryTime: %d ", newProc->entryTime);
+        }
+        else
+        {
+            /*DEBUG*/   //printf("%d ", atoi(buff));
+            newProc->runTime = atoi(buff);
+            insertBack(start, newProc);
+            sharedResource->startDataSize++;
+            /*DEBUG*/   //printf("runTime: %d \n", newProc->runTime);
+        }
+        i++;
+    }
+}
+
+void printData(node *doneStart, node *pointer) {
     printf("\n");
     if(pointer==doneStart)
     {
@@ -103,7 +156,6 @@ int main(int argc, const char * argv[]) {
     pthread_t clockThread;
     pthread_t readyQThread;
     pthread_t cpuThread;
-    char buff[255];
     
     node *start;
     start = (node *)malloc(sizeof(node));
@@ -127,36 +179,9 @@ int main(int argc, const char * argv[]) {
     sharedResource->doneQ = doneQ;
     sharedResource->cpuState = 0;
     
-    FILE *fp;
-    //Sean you will probably need to change the path based on where you put the project
-    fp=fopen("/Users/cvrahimis/Documents/CSAdvOS/CProjects/OSSimulator/OSSimulator/dataFile.txt", "r");
-    int i = 0;
-    process *newProc = NULL;
-    while (fscanf(fp, "%s", buff) != EOF) {
-/*DEBUG*///printf("%d \n", atoi(buff));
-        if (i % 3 == 0)
-        {
-            newProc = (process *) malloc(sizeof(process));
-/*DEBUG*/   //printf("%d ", atoi(buff));
-            newProc->pID = atoi(buff);
-/*DEBUG*/   //printf(" pID: %d ", newProc->pID);
-        }
-        else if (i % 3 == 1)
-        {
-/*DEBUG*/   //printf("%d ", atoi(buff));
-            newProc->entryTime = atoi(buff);
-/*DEBUG*/   //printf("entryTime: %d ", newProc->entryTime);
-        }
-        else
-        {
-/*DEBUG*/   //printf("%d ", atoi(buff));
-            newProc->runTime = atoi(buff);
-            insertBack(start, newProc);
-            sharedResource->startDataSize++;
-/*DEBUG*/   //printf("runTime: %d \n", newProc->runTime);
-        }
-        i++;
-    }
+    loadProcessesFromFile("/Users/Sean/Documents/College/Spring 2016/Advanced OS/OSSimulator/OSSimulator/dataFile.txt", start, sharedResource);
+    //loadProcessesFromFile("/Users/cvrahimis/Documents/CSAdvOS/CProjects/OSSimulator/OSSimulator/dataFile.txt", start, sharedResource);
+    
     print(start, start->next);
     printf("\n=================================\n");
     sharedResource->startData = start;

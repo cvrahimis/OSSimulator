@@ -46,7 +46,7 @@ void insertFront(node *start, process *data)
 void sort(node *start)
 {
     int i;
-    for (i = 0; i < size; i++)
+    for (i = 0; i < size(); i++)
     {
         node *pointer = start->next;
         node *next = pointer->next;
@@ -165,7 +165,7 @@ void delete(node *start, int pID)
 }
 
 void removeFront(node *start){
-    if (size > 0) {
+    if (size() > 0) {
         node *pointer = start->next;
         node *next = pointer->next;
         
@@ -182,7 +182,7 @@ void removeFront(node *start){
 }
 
 void removeBack(node *start){
-    if (size > 0) {
+    if (size() > 0) {
         node *pointer = start->prev;
         node *next = pointer->prev;
         
