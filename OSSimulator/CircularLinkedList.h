@@ -18,7 +18,7 @@ typedef struct Process
     int entryTime;
     int runTime;
     int timeEnteredReadyQ;
-    int timeEnteredCUP;
+    int timeEnteredCPU;
     int timeDone;
     //int memory;
 }process;
