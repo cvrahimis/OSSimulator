@@ -12,20 +12,27 @@
 #include <unistd.h>
 #include "CircularLinkedList.h"
 
+#include "fifoscheduler.h"
+#define SCHEDULER fifoscheduler
+
 #define LOAD_PROCESSES_FROM_FILE 1
-//#define EXECUTION_CONDITION (sharedResource->readyQsize > 0 || sharedResource->startDataSize > 0 || sharedResource->cpuState)
-#define EXECUTION_CONDITION (sharedResource->time < 100)
+#define EXECUTION_CONDITION (sharedResource->scheduler->readyQueueSize > 0 || sharedResource->startDataSize > 0 || sharedResource->cpuState == CPU_STATE_RUNNING)
+//#define EXECUTION_CONDITION (sharedResource->time < 100)
+
+
+#define CPU_STATE_FINISHED 0
+#define CPU_STATE_RUNNING  1
 
 pthread_mutex_t lock;
 
 typedef struct resources{
-    node *readyQstart;
+    SCHEDULER *scheduler;
     int time;
-    int readyQsize;
-    node *startData;
+    circularlistnode *startData;
     int startDataSize;
-    node *doneQ;
+    circularlistnode *doneQ;
     int cpuState;
+    int nextPid;
 }sharedRes;
 
 
@@ -34,14 +41,15 @@ typedef struct resources{
  * @param {sharedRes *} sharedResource - pointer to the shared resource for the OS
  * @return {process *} - a new random process or NULL, based on probability
  */
-process *generateRandomProcess(double probability, int minRunTime, int maxRunTime, int currentTime)
+process *generateRandomProcess(double probability, int minRunTime, int maxRunTime, sharedRes *sharedResource)//int currentTime)
 {
     double randomValue = (double)rand() / RAND_MAX;
     if (randomValue >= (1 - probability)) {
         process *newProc = (process *)malloc(sizeof(process));
-        //TODO: need to generate pID
-        newProc->pID = 0;
-        newProc->entryTime = currentTime;
+        pthread_mutex_lock(&lock);
+        newProc->pID = sharedResource->nextPid++;
+        pthread_mutex_unlock(&lock);
+        newProc->entryTime = sharedResource->time;//currentTime;
         int runTime = rand() % (maxRunTime - minRunTime) + minRunTime;
         newProc->runTime = runTime;
         return newProc;
@@ -53,24 +61,27 @@ void *cpu(void *arg){
     sharedRes *sharedResource = (sharedRes *) arg;
     process *currentProcess = NULL;
     while (EXECUTION_CONDITION)
-//    while (sharedResource->readyQsize > 0 || sharedResource->startDataSize > 0 || sharedResource->cpuState)
     {
-        if (!sharedResource->cpuState && sharedResource->readyQsize > 0) {
-            sharedResource->cpuState = 1;
-            currentProcess = sharedResource->readyQstart->next->current;//locate(sharedResource->readyQstart, (((sharedResource->readyQstart)->next)->current)->pID)->current;
-            
-            int timeEntered = sharedResource->time;
-            currentProcess->timeEnteredCPU = timeEntered;
-            delete(sharedResource->readyQstart, currentProcess->pID);
-            sharedResource->readyQsize--;
-            printf("Running pID: %d \n", currentProcess->pID);
+        if (sharedResource->cpuState == CPU_STATE_FINISHED && sharedResource->scheduler->readyQueueSize > 0) {
+            pthread_mutex_lock(&lock);
+            currentProcess = nextProcess(sharedResource->scheduler);
+            pthread_mutex_unlock(&lock);
+            if (currentProcess != NULL) {
+                currentProcess->timeEnteredCPU = sharedResource->time;
+                pthread_mutex_lock(&lock);
+                sharedResource->cpuState = CPU_STATE_RUNNING;
+                pthread_mutex_unlock(&lock);
+                printf("Running pID: %d \n", currentProcess->pID);
+            }
         }
         if (currentProcess != NULL && currentProcess->runTime <= (sharedResource->time - currentProcess->timeEnteredCPU)) {
             currentProcess->timeDone = sharedResource->time;
+            pthread_mutex_lock(&lock);
             insertBack(sharedResource->doneQ, currentProcess);
+            sharedResource->cpuState = CPU_STATE_FINISHED;
+            pthread_mutex_unlock(&lock);
             printf("Added pID: %d to the doneQ \n", currentProcess->pID);
             //delete(sharedResource->readyQstart, currentProcess->pID);
-            sharedResource->cpuState = 0;
             currentProcess = NULL;
         }
     }
@@ -81,62 +92,39 @@ void *cpu(void *arg){
 void *cpuClock(void *arg){
     sharedRes *sharedResource = (sharedRes *) arg;
     while (EXECUTION_CONDITION) {
-//    while (sharedResource->readyQsize > 0 || sharedResource->startDataSize > 0 || sharedResource->cpuState) {
         pthread_mutex_lock(&lock);
         sharedResource->time++;
         pthread_mutex_unlock(&lock);
         //printf("Tick: %d \n", t);
         if (!LOAD_PROCESSES_FROM_FILE) {
             // On every tick, randomly choose whether or not to create a process.
-            process *proc = generateRandomProcess(0.3, 1, 10, sharedResource->time);
-            if (proc != NULL)
-                insertBack(sharedResource->startData, proc);
+            process *proc = generateRandomProcess(0.3, 1, 10, sharedResource);//->time);
+            if (proc != NULL) {
+                printf("Scheduling process %d\n", proc->pID);
+                pthread_mutex_lock(&lock);
+                schedule(sharedResource->scheduler, proc, sharedResource->time);
+                pthread_mutex_unlock(&lock);
+            }
         }
         sleep(1);
     }
     
     pthread_exit(NULL);
 }
-/*
-void *addToReadyQ(void *arg){
-    sharedRes *sharedResource = (sharedRes *) arg;
-    node *initData = sharedResource->startData;
-    while(EXECUTION_CONDITION) {
-//    while(sharedResource->readyQsize > 0 || sharedResource->startDataSize > 0) {
-        while(initData->next != sharedResource->startData || sharedResource->startDataSize > 0){
-            if (initData != sharedResource->startData && (initData->current)->entryTime <= sharedResource->time) {
-                (initData->current)->timeEnteredReadyQ = sharedResource->time;
-                insertBack(sharedResource->readyQstart, initData->current);
-                printf("Added pID: %d to the ReadyQ \n", (initData->current)->pID);
-                sharedResource->readyQsize++;
-                //print(sharedResource->readyQstart, (sharedResource->readyQstart)->next);
-                //printf("\n=================================\n");
-                delete(sharedResource->startData, initData->current->pID);
-                sharedResource->startDataSize--;
-            }
-            initData = initData->next;
-        }
-        initData = initData->next;
-    }
-    
-    //print(sharedResource->readyQstart, (sharedResource->readyQstart)->next);
-    pthread_exit(NULL);
-}
-*/
 
-void *addToReadyQ(void *arg) {
+void *scheduleInitialData(void *arg) {
     sharedRes *sharedResource = (sharedRes *) arg;
-    node *initData = sharedResource->startData;
+    circularlistnode *initData = sharedResource->startData;
     while (EXECUTION_CONDITION) {
         if (initData != sharedResource->startData && initData->current && initData->current->entryTime <= sharedResource->time) {
-            (initData->current)->timeEnteredReadyQ = sharedResource->time;
-            insertBack(sharedResource->readyQstart, initData->current);
-            printf("Added pID: %d to the ReadyQ \n", (initData->current)->pID);
-            sharedResource->readyQsize++;
+            pthread_mutex_lock(&lock);
+            schedule(sharedResource->scheduler, initData->current, sharedResource->time);
             //print(sharedResource->readyQstart, (sharedResource->readyQstart)->next);
             //printf("\n=================================\n");
             delete(sharedResource->startData, initData->current->pID);
             sharedResource->startDataSize--;
+            pthread_mutex_unlock(&lock);
+            printf("Added pID: %d to the ReadyQ \n", (initData->current)->pID);
         }
         if (initData != NULL && initData->next != NULL)
             initData = initData->next;
@@ -149,7 +137,7 @@ void *addToReadyQ(void *arg) {
 }
 
 void loadProcessesFromFile(char *fileName, sharedRes *sharedResource) {
-    node *start = sharedResource->startData;
+    circularlistnode *start = sharedResource->startData;
     
     FILE *fp;
     char buff[255];
@@ -187,44 +175,34 @@ void loadProcessesFromFile(char *fileName, sharedRes *sharedResource) {
     sharedResource->startData = start;
 }
 
-void printData(node *doneStart, node *pointer) {
-    printf("\n");
-    if(pointer==doneStart)
-    {
-        return;
-    }
-    printf("pid: %d entrytime: %d runtime: %d timeEnteredReadyQ: %d timeEnteredCPU: %d timeComplete: %d \n",(pointer->current)->pID, (pointer->current)->entryTime, (pointer->current)->runTime, (pointer->current)->timeEnteredReadyQ, (pointer->current)->timeEnteredCPU, (pointer->current)->timeDone);
-    printData(doneStart, pointer->next);
-}
-
 int main(int argc, const char * argv[]) {
     int rc;
     pthread_t clockThread;
     pthread_t readyQThread;
     pthread_t cpuThread;
     
-    node *readyQ;
-    readyQ = (node *)malloc(sizeof(node));
-    readyQ -> next = readyQ;
-    readyQ -> prev = readyQ;
-    
-    node *doneQ;
-    doneQ = (node *)malloc(sizeof(node));
+    circularlistnode *doneQ;
+    doneQ = (circularlistnode *)malloc(sizeof(circularlistnode));
     doneQ -> next = doneQ;
     doneQ -> prev = doneQ;
     
-    node *start;
-    start = (node *)malloc(sizeof(node));
+    circularlistnode *start;
+    start = (circularlistnode *)malloc(sizeof(circularlistnode));
     start -> next = start;
     start -> prev = start;
     
+    SCHEDULER *scheduler = (SCHEDULER *)malloc(sizeof(SCHEDULER));
+    init_scheduler(scheduler);
+    
     sharedRes *sharedResource = (sharedRes *) malloc(sizeof(sharedRes));
-    sharedResource->readyQstart = readyQ;
+    sharedResource->scheduler = scheduler;
     sharedResource->time = 0;
     sharedResource->startDataSize = 0;
     sharedResource->doneQ = doneQ;
     sharedResource->cpuState = 0;
     sharedResource->startData = start;
+    
+    pthread_mutex_init(&lock, NULL);
 
     // Seed the random function.
     srand((unsigned int)time(NULL));
@@ -239,11 +217,13 @@ int main(int argc, const char * argv[]) {
         printf("ERROR. Return code from thread %d\n", rc);
         exit(-1);
     }
-    rc = pthread_create(&readyQThread, NULL, addToReadyQ, (void *)sharedResource);
-    if(rc)
-    {
-        printf("ERROR. Return code from thread %d\n", rc);
-        exit(-1);
+    if (LOAD_PROCESSES_FROM_FILE) {
+        rc = pthread_create(&readyQThread, NULL, scheduleInitialData, (void *)sharedResource);
+        if(rc)
+        {
+            printf("ERROR. Return code from thread %d\n", rc);
+            exit(-1);
+        }
     }
     rc = pthread_create(&cpuThread, NULL, cpu, (void *)sharedResource);
     if(rc)
@@ -258,11 +238,13 @@ int main(int argc, const char * argv[]) {
         printf("Error, return code from thread_join() is %d\n", rc);
         exit(-1);
     }
-    rc = pthread_join(readyQThread, NULL);
-    if(rc)
-    {
-        printf("Error, return code from thread_join() is %d\n", rc);
-        exit(-1);
+    if (LOAD_PROCESSES_FROM_FILE) {
+        rc = pthread_join(readyQThread, NULL);
+        if(rc)
+        {
+            printf("Error, return code from thread_join() is %d\n", rc);
+            exit(-1);
+        }
     }
     rc = pthread_join(cpuThread, NULL);
     if(rc)

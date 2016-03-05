@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		14C492A41C8A34F500E5589F /* fifoscheduler.c in Sources */ = {isa = PBXBuildFile; fileRef = 14C492A31C8A34F500E5589F /* fifoscheduler.c */; };
 		D50591F61C7569850030E4C6 /* main.c in Sources */ = {isa = PBXBuildFile; fileRef = D50591F51C7569850030E4C6 /* main.c */; };
 		D5F77D381C75F6FF00D5107B /* CircularLinkedList.c in Sources */ = {isa = PBXBuildFile; fileRef = D5F77D361C75F6FF00D5107B /* CircularLinkedList.c */; };
 /* End PBXBuildFile section */
@@ -24,6 +25,9 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		14C492A21C8A34E200E5589F /* fifoscheduler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = fifoscheduler.h; sourceTree = "<group>"; };
+		14C492A31C8A34F500E5589F /* fifoscheduler.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = fifoscheduler.c; sourceTree = "<group>"; };
+		14C492A51C8A382D00E5589F /* process.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = process.h; sourceTree = "<group>"; };
 		D50591F21C7569850030E4C6 /* OSSimulator */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = OSSimulator; sourceTree = BUILT_PRODUCTS_DIR; };
 		D50591F51C7569850030E4C6 /* main.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = main.c; sourceTree = "<group>"; };
 		D5F77D361C75F6FF00D5107B /* CircularLinkedList.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = CircularLinkedList.c; sourceTree = "<group>"; };
@@ -63,8 +67,11 @@
 			children = (
 				D5F7C9FB1C76C82F00F19328 /* dataFile.txt */,
 				D50591F51C7569850030E4C6 /* main.c */,
+				14C492A21C8A34E200E5589F /* fifoscheduler.h */,
+				14C492A31C8A34F500E5589F /* fifoscheduler.c */,
 				D5F77D361C75F6FF00D5107B /* CircularLinkedList.c */,
 				D5F77D371C75F6FF00D5107B /* CircularLinkedList.h */,
+				14C492A51C8A382D00E5589F /* process.h */,
 			);
 			path = OSSimulator;
 			sourceTree = "<group>";
@@ -125,6 +132,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				14C492A41C8A34F500E5589F /* fifoscheduler.c in Sources */,
 				D50591F61C7569850030E4C6 /* main.c in Sources */,
 				D5F77D381C75F6FF00D5107B /* CircularLinkedList.c in Sources */,
 			);

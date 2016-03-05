@@ -9,38 +9,28 @@
 #ifndef CircularLinkedList_h
 #define CircularLinkedList_h
 
-#include <stdio.h>
-#include <stdlib.h>
+#include "process.h"
 
-typedef struct Process
-{
-    int pID;
-    int entryTime;
-    int runTime;
-    int timeEnteredReadyQ;
-    int timeEnteredCPU;
-    int timeDone;
-    //int memory;
-}process;
-
-
-typedef struct Node
+typedef struct CircularListNode
 {
     struct Process *current;
-    struct Node *next;
-    struct Node *prev;
-}node;
+    struct CircularListNode *next;
+    struct CircularListNode *prev;
+} circularlistnode;
 
-void print(node *start,node *pointer);
-void insertBack(node *pointer, process *data);
-void sort(node *start);
-void insertSorted(node *start, process *data);
-void insertFront(node *pointer, process *data);
-int find(node *pointer, int key);
-void delete(node *pointer, int pID);
-void removeFront(node *start);
-void removeBack(node *start);
-node * locate(node *start, int key);
+void print(circularlistnode *start,circularlistnode *pointer);
+void enqueue(circularlistnode *start, process *data);
+process *dequeue(circularlistnode *start);
+void insertBack(circularlistnode *pointer, process *data);
+void sort(circularlistnode *start);
+void insertSorted(circularlistnode *start, process *data);
+void insertFront(circularlistnode *pointer, process *data);
+int find(circularlistnode *pointer, int key);
+void delete(circularlistnode *pointer, int pID);
+void removeFront(circularlistnode *start);
+void removeBack(circularlistnode *start);
+circularlistnode * locate(circularlistnode *start, int key);
 int size();
+void printData(circularlistnode *doneStart, circularlistnode *pointer);
 
 #endif 

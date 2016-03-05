@@ -6,10 +6,12 @@
 //  Copyright © 2016 Costas Vrahimis. All rights reserved.
 //
 
+#include <stdlib.h>
+#include <stdio.h>
 #include "CircularLinkedList.h"
 int length = 0;
 
-void print(node *start,node *pointer)
+void print(circularlistnode *start, circularlistnode *pointer)
 {
     if(pointer==start)
     {
@@ -19,23 +21,45 @@ void print(node *start,node *pointer)
     print(start, pointer->next);
 }
 
-void insertBack(node *start, process *data)
+void enqueue(circularlistnode *start, process *data)
 {
-    node *addBack = start->prev;
+    insertBack(start, data);
+}
+
+process *dequeue(circularlistnode *start)
+{
+    if (length == 0)
+        return NULL;
+
+    circularlistnode *pointer = start->next;
+    circularlistnode *next = pointer->next;
     
-    addBack->next = (node *)malloc(sizeof(node));
-    (addBack->next)->current = data;
-    (addBack->next)->prev = addBack;
-    (addBack->next)->next = start;
+    start->next = next;
+    next->prev = start;
+    
+    process *proc = pointer->current;
+    free(pointer);
+    length--;
+    return proc;
+}
+
+void insertBack(circularlistnode *start, process *data)
+{
+    circularlistnode *addBack = start->prev;
+    
+    addBack->next = (circularlistnode *)malloc(sizeof(circularlistnode));
+    addBack->next->current = data;
+    addBack->next->prev = addBack;
+    addBack->next->next = start;
     start->prev = addBack->next;
     length++;
 }
 
-void insertFront(node *start, process *data)
+void insertFront(circularlistnode *start, process *data)
 {
-    node *addFront = start->next;
+    circularlistnode *addFront = start->next;
     
-    addFront->prev = (node *)malloc(sizeof(node));
+    addFront->prev = (circularlistnode *)malloc(sizeof(circularlistnode));
     (addFront->prev)->current = data;
     (addFront->prev)->next = addFront;
     (addFront->prev)->prev = start;
@@ -43,18 +67,18 @@ void insertFront(node *start, process *data)
     length++;
 }
 
-void sort(node *start)
+void sort(circularlistnode *start)
 {
     int i;
     for (i = 0; i < size(); i++)
     {
-        node *pointer = start->next;
-        node *next = pointer->next;
+        circularlistnode *pointer = start->next;
+        circularlistnode *next = pointer->next;
         while(pointer->next != start)
         {
             if ((next->current)->entryTime < (pointer->current)->entryTime)
             {
-                node *hold = (node *)malloc(sizeof(node));
+                circularlistnode *hold = (circularlistnode *)malloc(sizeof(circularlistnode));
                 hold->next = pointer->next;
                 hold->prev = pointer->prev;
                 
@@ -71,20 +95,20 @@ void sort(node *start)
     }
 }
 
-void insertSorted(node *start, process *data)
+void insertSorted(circularlistnode *start, process *data)
 {
     if (length == 0) {
         insertFront(start, data);
         return;
     }
-    node *pointer = start->next;
-    node *trail = start;
+    circularlistnode *pointer = start->next;
+    circularlistnode *trail = start;
     
     while(1)
     {
         if (data->runTime <= (pointer->current)->runTime)
         {
-            node *insert = (node *)malloc(sizeof(node));
+            circularlistnode *insert = (circularlistnode *)malloc(sizeof(circularlistnode));
             insert->current = data;
             insert->next = pointer;
             insert->prev = trail;
@@ -95,7 +119,7 @@ void insertSorted(node *start, process *data)
         }
         if (data->runTime > (pointer->current)->runTime && pointer->next == start)
         {
-            node *insert = (node *)malloc(sizeof(node));
+            circularlistnode *insert = (circularlistnode *)malloc(sizeof(circularlistnode));
             insert->current = data;
             insert->prev = pointer;
             insert->next = start;
@@ -110,9 +134,9 @@ void insertSorted(node *start, process *data)
     }
 }
 
-int find(node *start, int key)
+int find(circularlistnode *start, int key)
 {
-    node *pointer = start->next;
+    circularlistnode *pointer = start->next;
     while(pointer!=start)
     {
         if((pointer->current)->pID == key)
@@ -124,10 +148,10 @@ int find(node *start, int key)
     return 0;
 }
 
-node * locate(node *start, int key)
+circularlistnode * locate(circularlistnode *start, int key)
 {
     //sort(start);
-    node *pointer = start->next;
+    circularlistnode *pointer = start->next;
     while(pointer!=start)
     {
         if((pointer->current)->pID == key)
@@ -139,13 +163,13 @@ node * locate(node *start, int key)
     return NULL;
 }
 
-void delete(node *start, int pID)
+void delete(circularlistnode *start, int pID)
 {
     if (length <= 0) {
         printf("List is empty \n\n");
         return;
     }
-    node *pointer = start->next;
+    circularlistnode *pointer = start->next;
     while(pointer->next!=start && (pointer->current)->pID != pID)
     {
         pointer = pointer -> next;
@@ -164,10 +188,10 @@ void delete(node *start, int pID)
     return;
 }
 
-void removeFront(node *start){
+void removeFront(circularlistnode *start){
     if (size() > 0) {
-        node *pointer = start->next;
-        node *next = pointer->next;
+        circularlistnode *pointer = start->next;
+        circularlistnode *next = pointer->next;
         
         start->next = next;
         next->prev = start;
@@ -181,10 +205,10 @@ void removeFront(node *start){
     }
 }
 
-void removeBack(node *start){
+void removeBack(circularlistnode *start){
     if (size() > 0) {
-        node *pointer = start->prev;
-        node *next = pointer->prev;
+        circularlistnode *pointer = start->prev;
+        circularlistnode *next = pointer->prev;
         
         start->prev = next;
         next->next = start;
@@ -200,4 +224,14 @@ void removeBack(node *start){
 
 int size(){
     return length;
+}
+
+void printData(circularlistnode *doneStart, circularlistnode *pointer) {
+    printf("\n");
+    if(pointer==doneStart)
+    {
+        return;
+    }
+    printf("pid: %d entrytime: %d runtime: %d timeEnteredReadyQ: %d timeEnteredCPU: %d timeComplete: %d \n",(pointer->current)->pID, (pointer->current)->entryTime, (pointer->current)->runTime, (pointer->current)->timeEnteredReadyQ, (pointer->current)->timeEnteredCPU, (pointer->current)->timeDone);
+    printData(doneStart, pointer->next);
 }
