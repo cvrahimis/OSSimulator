@@ -145,27 +145,20 @@ void loadProcessesFromFile(char *fileName, sharedRes *sharedResource) {
     int i = 0;
     process *newProc = NULL;
     while (fscanf(fp, "%s", buff) != EOF) {
-        /*DEBUG*///printf("%d \n", atoi(buff));
         if (i % 3 == 0)
         {
             newProc = (process *) malloc(sizeof(process));
-            /*DEBUG*/   //printf("%d ", atoi(buff));
             newProc->pID = atoi(buff);
-            /*DEBUG*/   //printf(" pID: %d ", newProc->pID);
         }
         else if (i % 3 == 1)
         {
-            /*DEBUG*/   //printf("%d ", atoi(buff));
             newProc->entryTime = atoi(buff);
-            /*DEBUG*/   //printf("entryTime: %d ", newProc->entryTime);
         }
         else
         {
-            /*DEBUG*/   //printf("%d ", atoi(buff));
             newProc->runTime = atoi(buff);
             insertBack(start, newProc);
             sharedResource->startDataSize++;
-            /*DEBUG*/   //printf("runTime: %d \n", newProc->runTime);
         }
         i++;
     }
@@ -208,8 +201,8 @@ int main(int argc, const char * argv[]) {
     srand((unsigned int)time(NULL));
 
     if (LOAD_PROCESSES_FROM_FILE)
-        loadProcessesFromFile("/Users/Sean/Documents/College/Spring 2016/Advanced OS/OSSimulator/OSSimulator/dataFile.txt", sharedResource);
-        //loadProcessesFromFile("/Users/cvrahimis/Documents/CSAdvOS/CProjects/OSSimulator/OSSimulator/dataFile.txt", sharedResource);
+        //loadProcessesFromFile("/Users/Sean/Documents/College/Spring 2016/Advanced OS/OSSimulator/OSSimulator/dataFile.txt", sharedResource);
+        loadProcessesFromFile("/Users/cvrahimis/Documents/CSAdvOS/CProjects/OSSimulator/OSSimulator/dataFile.txt", sharedResource);
     
     rc = pthread_create(&clockThread, NULL, cpuClock, (void *)sharedResource);
     if(rc)
