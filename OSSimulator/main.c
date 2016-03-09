@@ -17,9 +17,7 @@
 
 #define LOAD_PROCESSES_FROM_FILE 1
 #define EXECUTION_CONDITION (sharedResource->scheduler->readyQueueStart->next != sharedResource->scheduler->readyQueueStart || sharedResource->startDataSize > 0 || sharedResource->cpuState == CPU_STATE_RUNNING)
-#define EXECUTION_CONDITION_EMPTY (sharedResource->scheduler->readyQueueStart->next != sharedResource->scheduler->readyQueueStart || sharedResource->startDataSize > 0 || sharedResource->cpuState == CPU_STATE_FINISHED)
 //#define EXECUTION_CONDITION (sharedResource->time < 100)
-
 
 #define CPU_STATE_FINISHED 0
 #define CPU_STATE_RUNNING  1
