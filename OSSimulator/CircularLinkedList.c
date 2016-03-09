@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "CircularLinkedList.h"
-int length = 0;
+//int length = 0;
 
 void print(circularlistnode *start, circularlistnode *pointer)
 {
@@ -28,7 +28,7 @@ void enqueue(circularlistnode *start, process *data)
 
 process *dequeue(circularlistnode *start)
 {
-    if (length == 0)
+    if (start->next == start)
         return NULL;
 
     circularlistnode *pointer = start->next;
@@ -39,7 +39,7 @@ process *dequeue(circularlistnode *start)
     
     process *proc = pointer->current;
     free(pointer);
-    length--;
+    //length--;
     return proc;
 }
 
@@ -52,7 +52,7 @@ void insertBack(circularlistnode *start, process *data)
     addBack->next->prev = addBack;
     addBack->next->next = start;
     start->prev = addBack->next;
-    length++;
+    //length++;
 }
 
 void insertFront(circularlistnode *start, process *data)
@@ -64,9 +64,9 @@ void insertFront(circularlistnode *start, process *data)
     (addFront->prev)->next = addFront;
     (addFront->prev)->prev = start;
     start->next = addFront->prev;
-    length++;
+    //length++;
 }
-
+/*
 void sort(circularlistnode *start)
 {
     int i;
@@ -132,8 +132,8 @@ void insertSorted(circularlistnode *start, process *data)
         pointer = pointer->next;
         //next = pointer->next;
     }
-}
-
+}*/
+/*
 int find(circularlistnode *start, int key)
 {
     circularlistnode *pointer = start->next;
@@ -162,10 +162,10 @@ circularlistnode * locate(circularlistnode *start, int key)
     }
     return NULL;
 }
-
-void delete(circularlistnode *start, int pID)
+*/
+void del(circularlistnode *start, int pID)
 {
-    if (length <= 0) {
+    if (start == start->next) {
         printf("List is empty \n\n");
         return;
     }
@@ -183,11 +183,11 @@ void delete(circularlistnode *start, int pID)
     (pointer->prev)->next = pointer->next;
     (pointer->next)->prev = pointer->prev;
     free(pointer);
-    length--;
+    //length--;
     
     return;
 }
-
+/*
 void removeFront(circularlistnode *start){
     if (size() > 0) {
         circularlistnode *pointer = start->next;
@@ -225,7 +225,7 @@ void removeBack(circularlistnode *start){
 int size(){
     return length;
 }
-
+*/
 void printData(circularlistnode *doneStart, circularlistnode *pointer) {
     printf("\n");
     if(pointer==doneStart)

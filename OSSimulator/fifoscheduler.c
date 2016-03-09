@@ -9,6 +9,8 @@
 #include "CircularLinkedList.h"
 #include "fifoscheduler.h"
 #include <stdlib.h>
+#include <pthread.h>
+#include <unistd.h>
 
 void init_scheduler(fifoscheduler *scheduler)
 {
