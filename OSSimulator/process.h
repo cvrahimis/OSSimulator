@@ -17,6 +17,7 @@ typedef struct Process
     int timeEnteredReadyQ;
     int timeEnteredCPU;
     int timeDone;
+    double probGenerateInterrupt;
     //int memory;
 } process;
 

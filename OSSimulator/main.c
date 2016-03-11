@@ -15,8 +15,8 @@
 #include "fifoscheduler.h"
 #define SCHEDULER fifoscheduler
 
-#define LOAD_PROCESSES_FROM_FILE 1
-#define EXECUTION_CONDITION (sharedResource->scheduler->readyQueueStart->next != sharedResource->scheduler->readyQueueStart || sharedResource->startDataSize > 0 || sharedResource->cpuState == CPU_STATE_RUNNING)
+#define LOAD_PROCESSES_FROM_FILE 0
+#define EXECUTION_CONDITION (sharedResource->scheduler->readyQueueStart->next != sharedResource->scheduler->readyQueueStart || sharedResource->startDataSize > 0 || sharedResource->cpuState == CPU_STATE_RUNNING || sharedResource->doneQ == sharedResource->doneQ->next)
 //#define EXECUTION_CONDITION (sharedResource->time < 100)
 
 #define CPU_STATE_FINISHED 0
@@ -142,6 +142,7 @@ void *cpuRR(void *arg){
 
 void *cpuClock(void *arg){
     sharedRes *sharedResource = (sharedRes *) arg;
+    int numOfRandGenProcs = 5;
     while (EXECUTION_CONDITION) {
         pthread_mutex_lock(&lock);
         sharedResource->time++;
@@ -150,10 +151,11 @@ void *cpuClock(void *arg){
         if (!LOAD_PROCESSES_FROM_FILE) {
             // On every tick, randomly choose whether or not to create a process.
             process *proc = generateRandomProcess(0.3, 1, 10, sharedResource);//->time);
-            if (proc != NULL) {
+            if (proc != NULL && numOfRandGenProcs > 0) {
                 printf("Scheduling process %d\n", proc->pID);
                 //pthread_mutex_lock(&lock);
                 synchronizedSchedule(sharedResource, proc);
+                numOfRandGenProcs--;
                 //pthread_mutex_unlock(&lock);
             }
         }
@@ -268,8 +270,8 @@ int main(int argc, const char * argv[]) {
             exit(-1);
         }
     }
-    //rc = pthread_create(&cpuThread, NULL, cpu, (void *)sharedResource);
-    rc = pthread_create(&cpuThread, NULL, cpuRR, (void *)sharedResource);
+    rc = pthread_create(&cpuThread, NULL, cpu, (void *)sharedResource);
+    //rc = pthread_create(&cpuThread, NULL, cpuRR, (void *)sharedResource);
     if(rc)
     {
         printf("ERROR. Return code from thread %d\n", rc);
