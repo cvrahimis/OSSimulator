@@ -31,6 +31,7 @@ void del(circularlistnode *pointer, int pID);
 //void removeBack(circularlistnode *start);
 //circularlistnode * locate(circularlistnode *start, int key);
 //int size();
+void removeNode(circularlistnode *node);
 void printData(circularlistnode *doneStart, circularlistnode *pointer);
 
 #endif 

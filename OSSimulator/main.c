@@ -15,10 +15,10 @@
 #include "fifoscheduler.h"
 #define SCHEDULER fifoscheduler
 
-#define LOAD_PROCESSES_FROM_FILE 0
+#define LOAD_PROCESSES_FROM_FILE 1
 #define IS_FIFO 0
 
-#define EXECUTION_CONDITION (sharedResource->scheduler->readyQueueStart->next != sharedResource->scheduler->readyQueueStart || sharedResource->startDataSize > 0 || sharedResource->cpuState == CPU_STATE_RUNNING || sharedResource->doneQ == sharedResource->doneQ->next)
+#define EXECUTION_CONDITION (sharedResource->scheduler->readyQueueStart->next != sharedResource->scheduler->readyQueueStart || sharedResource->startData != sharedResource->startData->next  || sharedResource->cpuState == CPU_STATE_RUNNING || sharedResource->doneQ == sharedResource->doneQ->next || (!LOAD_PROCESSES_FROM_FILE && sharedResource->numOfRandGenProcs > 0) || sharedResource->waitQ != sharedResource->waitQ->next)
 //#define EXECUTION_CONDITION (sharedResource->time < 100)
 
 #define CPU_STATE_FINISHED 0
@@ -35,6 +35,8 @@ typedef struct resources{
     int cpuState;
     int nextPid;
     int timeSlice;
+    circularlistnode *waitQ;
+    int numOfRandGenProcs;
 }sharedRes;
 
 void synchronizedSchedule(sharedRes *sharedResource, process *proc){
@@ -66,6 +68,7 @@ process *generateRandomProcess(double probability, int minRunTime, int maxRunTim
         newProc->entryTime = sharedResource->time;//currentTime;
         int runTime = rand() % (maxRunTime - minRunTime) + minRunTime;
         newProc->runTime = runTime;
+        newProc->probSystemCall = .1;//give every process the same chance of generating a system call for now but should be random
         return newProc;
     }
     return NULL;
@@ -74,6 +77,7 @@ process *generateRandomProcess(double probability, int minRunTime, int maxRunTim
 void *cpu(void *arg){
     sharedRes *sharedResource = (sharedRes *) arg;
     process *currentProcess = NULL;
+    int oldTime = sharedResource->time;
     while (EXECUTION_CONDITION)
     {
         if (sharedResource->cpuState == CPU_STATE_FINISHED && sharedResource->scheduler->readyQueueSize > 0) {
@@ -83,7 +87,7 @@ void *cpu(void *arg){
                 pthread_mutex_lock(&lock);
                 sharedResource->cpuState = CPU_STATE_RUNNING;
                 pthread_mutex_unlock(&lock);
-                printf("Running pID: %d \n", currentProcess->pID);
+                printf("Running pID: %d With Run Time: %d Time: %d \n", currentProcess->pID, currentProcess->runTime, sharedResource->time);
             }
         }
         if (currentProcess != NULL && currentProcess->runTime <= (sharedResource->time - currentProcess->timeEnteredCPU)) {
@@ -95,6 +99,32 @@ void *cpu(void *arg){
             printf("Added pID: %d to the doneQ \n", currentProcess->pID);
             currentProcess = NULL;
         }
+        double randomValue = (double)rand() / RAND_MAX;
+        if (currentProcess != NULL && sharedResource->cpuState == CPU_STATE_RUNNING && randomValue >= (1 - currentProcess->probSystemCall) && oldTime != sharedResource->time) {
+            //Process has made a System Call
+            
+            currentProcess->runTime = (currentProcess->runTime - (sharedResource->time - currentProcess->timeEnteredCPU)) < 0 ? 0 : (currentProcess->runTime - (sharedResource->time - currentProcess->timeEnteredCPU)); //making sure the runTime cannot be negative
+            
+            currentProcess->timeInterrupt = ((int)rand() % 6) + 3;//setting the time it takes for the interrupt to complete
+            currentProcess->timeEnteredWaitQ = sharedResource->time;
+            enqueue(sharedResource->waitQ, currentProcess);
+            printf("Added pID: %d to the waitQ \n", currentProcess->pID);
+            sharedResource->cpuState = CPU_STATE_FINISHED;
+            currentProcess = NULL;
+            //oldTime = sharedResource->time;
+        }
+        circularlistnode *pointer = sharedResource->waitQ->next;
+        while(pointer != sharedResource->waitQ)
+        {
+            if (pointer->current->timeInterrupt <= (sharedResource->time - pointer->current->timeEnteredWaitQ)) {
+                removeNode(pointer);
+                pointer->current->timeInterrupt = 0;
+                synchronizedSchedule(sharedResource, pointer->current);
+                printf("Added pID: %d back to the readyQ \n", pointer->current->pID);
+            }
+            pointer = pointer->next;
+        }
+        oldTime = sharedResource->time;
     }
     
     pthread_exit(NULL);
@@ -103,6 +133,7 @@ void *cpu(void *arg){
 void *cpuRR(void *arg){
     sharedRes *sharedResource = (sharedRes *) arg;
     process *currentProcess = NULL;
+    int oldTime = sharedResource->time;
     //NOTE readyQSize is grator than 0 at the end of execution
     while (EXECUTION_CONDITION)
     {
@@ -112,7 +143,7 @@ void *cpuRR(void *arg){
             pthread_mutex_unlock(&lock);
             currentProcess = synchronizedNextProcess(sharedResource->scheduler);
             currentProcess->timeEnteredCPU = sharedResource->time;
-            printf("cpuRRThread Running pID: %d \n", currentProcess->pID);
+            printf("cpuRRThread Running pID: %d With Run Time: %d Time: %d \n", currentProcess->pID, currentProcess->runTime, sharedResource->time);
         }
         if (currentProcess != NULL && currentProcess->runTime <= (sharedResource->time - currentProcess->timeEnteredCPU) && sharedResource->cpuState) {
             currentProcess->timeDone = sharedResource->time;
@@ -138,13 +169,39 @@ void *cpuRR(void *arg){
             sharedResource->cpuState = CPU_STATE_FINISHED;
             currentProcess = NULL;
         }
+        double randomValue = (double)rand() / RAND_MAX;
+        if (currentProcess != NULL && sharedResource->cpuState == CPU_STATE_RUNNING && randomValue >= (1 - currentProcess->probSystemCall) && oldTime != sharedResource->time) {
+            //Process has made a System Call
+            
+            currentProcess->runTime = (currentProcess->runTime - (sharedResource->time - currentProcess->timeEnteredCPU)) < 0 ? 0 : (currentProcess->runTime - (sharedResource->time - currentProcess->timeEnteredCPU)); //making sure the runTime cannot be negative
+            
+            currentProcess->timeInterrupt = ((int)rand() % 6) + 3;//setting the time it takes for the interrupt to complete
+            currentProcess->timeEnteredWaitQ = sharedResource->time;
+            enqueue(sharedResource->waitQ, currentProcess);
+            printf("Added pID: %d to the waitQ \n", currentProcess->pID);
+            sharedResource->cpuState = CPU_STATE_FINISHED;
+            currentProcess = NULL;
+            //oldTime = sharedResource->time;
+        }
+        circularlistnode *pointer = sharedResource->waitQ->next;
+        while(pointer != sharedResource->waitQ)
+        {
+            if (pointer->current->timeInterrupt <= (sharedResource->time - pointer->current->timeEnteredWaitQ)) {
+                removeNode(pointer);
+                pointer->current->timeInterrupt = 0;
+                synchronizedSchedule(sharedResource, pointer->current);
+                printf("Added pID: %d back to the readyQ \n", pointer->current->pID);
+            }
+            pointer = pointer->next;
+        }
+        oldTime = sharedResource->time;
     }
     pthread_exit(NULL);
 }
 
 void *cpuClock(void *arg){
     sharedRes *sharedResource = (sharedRes *) arg;
-    int numOfRandGenProcs = 5;
+    //sharedResource->numOfRandGenProcs = 5;
     while (EXECUTION_CONDITION) {
         pthread_mutex_lock(&lock);
         sharedResource->time++;
@@ -153,19 +210,19 @@ void *cpuClock(void *arg){
         if (!LOAD_PROCESSES_FROM_FILE) {
             // On every tick, randomly choose whether or not to create a process.
             process *proc = generateRandomProcess(0.3, 1, 10, sharedResource);//->time);
-            if (proc != NULL && numOfRandGenProcs > 0) {
-                printf("Scheduling process %d\n", proc->pID);
+            if (proc != NULL && sharedResource->numOfRandGenProcs > 0) {
+                printf("Scheduling process pID: %d entryTime: %d runTime: %d \n", proc->pID, proc->entryTime, proc->runTime);
                 //pthread_mutex_lock(&lock);
                 synchronizedSchedule(sharedResource, proc);
-                numOfRandGenProcs--;
+                sharedResource->numOfRandGenProcs--;
                 //pthread_mutex_unlock(&lock);
             }
         }
         sleep(1);
     }
-    
     pthread_exit(NULL);
 }
+
 //problem in this method initdata being null
 void *scheduleInitialData(void *arg) {
     sharedRes *sharedResource = (sharedRes *) arg;
@@ -210,6 +267,7 @@ void loadProcessesFromFile(char *fileName, sharedRes *sharedResource) {
         else
         {
             newProc->runTime = atoi(buff);
+            newProc->probSystemCall = .1;
             insertBack(start, newProc);
             sharedResource->startDataSize++;
         }
@@ -237,6 +295,11 @@ int main(int argc, const char * argv[]) {
     start -> next = start;
     start -> prev = start;
     
+    circularlistnode *waitQ;
+    waitQ = (circularlistnode *)malloc(sizeof(circularlistnode));
+    waitQ -> next = waitQ;
+    waitQ -> prev = waitQ;
+    
     SCHEDULER *scheduler = (SCHEDULER *)malloc(sizeof(SCHEDULER));
     init_scheduler(scheduler);
     
@@ -249,6 +312,8 @@ int main(int argc, const char * argv[]) {
     sharedResource->startData = start;
     sharedResource->timeSlice = 4;
     sharedResource->nextPid = 0;
+    sharedResource->waitQ = waitQ;
+    sharedResource->numOfRandGenProcs = 5;
     
     pthread_mutex_init(&lock, NULL);
 

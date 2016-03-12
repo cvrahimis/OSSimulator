@@ -163,6 +163,15 @@ circularlistnode * locate(circularlistnode *start, int key)
     return NULL;
 }
 */
+void removeNode(circularlistnode *node)
+{
+    circularlistnode *previous = node->prev;
+    circularlistnode *next = node->next;
+    
+    previous->next = next;
+    next->prev = previous;
+}
+
 void del(circularlistnode *start, int pID)
 {
     if (start == start->next) {
