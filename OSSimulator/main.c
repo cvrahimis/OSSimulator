@@ -16,6 +16,8 @@
 #define SCHEDULER fifoscheduler
 
 #define LOAD_PROCESSES_FROM_FILE 0
+#define IS_FIFO 0
+
 #define EXECUTION_CONDITION (sharedResource->scheduler->readyQueueStart->next != sharedResource->scheduler->readyQueueStart || sharedResource->startDataSize > 0 || sharedResource->cpuState == CPU_STATE_RUNNING || sharedResource->doneQ == sharedResource->doneQ->next)
 //#define EXECUTION_CONDITION (sharedResource->time < 100)
 
@@ -246,6 +248,7 @@ int main(int argc, const char * argv[]) {
     sharedResource->cpuState = 0;
     sharedResource->startData = start;
     sharedResource->timeSlice = 4;
+    sharedResource->nextPid = 0;
     
     pthread_mutex_init(&lock, NULL);
 
@@ -270,8 +273,10 @@ int main(int argc, const char * argv[]) {
             exit(-1);
         }
     }
-    rc = pthread_create(&cpuThread, NULL, cpu, (void *)sharedResource);
-    //rc = pthread_create(&cpuThread, NULL, cpuRR, (void *)sharedResource);
+    if(IS_FIFO)
+        rc = pthread_create(&cpuThread, NULL, cpu, (void *)sharedResource);
+    else
+        rc = pthread_create(&cpuThread, NULL, cpuRR, (void *)sharedResource);
     if(rc)
     {
         printf("ERROR. Return code from thread %d\n", rc);
