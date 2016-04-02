@@ -9,6 +9,8 @@
 #ifndef process_h
 #define process_h
 
+#define INTERACTIVE_THRESHOLD 0.5
+
 typedef struct Process
 {
     int pID;
@@ -20,8 +22,11 @@ typedef struct Process
     double probSystemCall;
     int timeInterrupt;
     int timeEnteredWaitQ;
+    int priority;
+    int timeSlice;
     //int memory;
 } process;
 
+int processDynamicPriority(process *proc);
 
 #endif /* process_h */

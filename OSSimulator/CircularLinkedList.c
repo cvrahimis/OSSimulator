@@ -21,12 +21,12 @@ void print(circularlistnode *start, circularlistnode *pointer)
     print(start, pointer->next);
 }
 
-void enqueue(circularlistnode *start, process *data)
+void cll_enqueue(circularlistnode *start, process *data)
 {
     insertBack(start, data);
 }
 
-process *dequeue(circularlistnode *start)
+process *cll_dequeue(circularlistnode *start)
 {
     if (start->next == start)
         return NULL;
