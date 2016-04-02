@@ -12,7 +12,7 @@
 #include <pthread.h>
 #include <unistd.h>
 
-void init_scheduler(fifoscheduler *scheduler)
+void fifo_init_scheduler(fifoscheduler *scheduler)
 {
     scheduler->readyQueueSize = 0;
     circularlistnode *readyQ = (circularlistnode *)malloc(sizeof(circularlistnode));
@@ -21,15 +21,15 @@ void init_scheduler(fifoscheduler *scheduler)
     scheduler->readyQueueStart = readyQ;
 }
 
-void schedule(fifoscheduler *scheduler, process *proc, int time)
+void fifo_schedule(fifoscheduler *scheduler, process *proc, int time)
 {
     proc->timeEnteredReadyQ = time;
     scheduler->readyQueueSize++;
-    enqueue(scheduler->readyQueueStart, proc);
+    cll_enqueue(scheduler->readyQueueStart, proc);
 }
 
-process *nextProcess(fifoscheduler *scheduler)
+process *fifo_nextProcess(fifoscheduler *scheduler)
 {
     scheduler->readyQueueSize--;
-    return dequeue(scheduler->readyQueueStart);
+    return cll_dequeue(scheduler->readyQueueStart);
 }
