@@ -10,12 +10,13 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <math.h>
 #include "CircularLinkedList.h"
 
 #include "fifoscheduler.h"
 #define SCHEDULER fifoscheduler
 
-#define LOAD_PROCESSES_FROM_FILE 1
+#define LOAD_PROCESSES_FROM_FILE 0
 #define IS_FIFO 0
 
 #define EXECUTION_CONDITION (sharedResource->scheduler->readyQueueStart->next != sharedResource->scheduler->readyQueueStart || sharedResource->startData != sharedResource->startData->next  || sharedResource->cpuState == CPU_STATE_RUNNING || sharedResource->doneQ == sharedResource->doneQ->next || (!LOAD_PROCESSES_FROM_FILE && sharedResource->numOfRandGenProcs > 0) || sharedResource->waitQ != sharedResource->waitQ->next)
@@ -23,8 +24,16 @@
 
 #define CPU_STATE_FINISHED 0
 #define CPU_STATE_RUNNING  1
+#define NUM_OF_MEM 128
+
 
 pthread_mutex_t lock;
+
+typedef struct page{
+    int startAddress;
+    int size;
+    struct page *next;
+}page;
 
 typedef struct resources{
     SCHEDULER *scheduler;
@@ -37,9 +46,50 @@ typedef struct resources{
     int timeSlice;
     circularlistnode *waitQ;
     int numOfRandGenProcs;
+    page *freeMemoryArray;
 }sharedRes;
 
+int allocate(sharedRes *sharedResource, process *proc){
+    int originalIndex = ((int)log2(proc->requiredMemoryPages)) + 1;
+    int index = originalIndex;
+    page *contigiousPages = &sharedResource->freeMemoryArray[index];
+    while (contigiousPages == NULL) {
+        index++;
+        contigiousPages = &sharedResource->freeMemoryArray[index];
+    }
+    page* currentPage = contigiousPages;
+    while(originalIndex <= index)
+    {
+        index--;
+        int buddySize = contigiousPages->size / 2;
+        page *buddy1 = (page *)malloc(sizeof(page));
+        buddy1->startAddress = currentPage->startAddress;
+        buddy1->size = buddySize;
+        page *buddy2 = (page *)malloc(sizeof(page));
+        buddy2->startAddress = buddy1->startAddress + buddy1->size;
+        buddy2->size = buddySize;
+        buddy1->next = buddy2;
+        sharedResource->freeMemoryArray[index] = *buddy1;
+        currentPage = buddy1;
+    }
+    if (&sharedResource->freeMemoryArray[originalIndex] != NULL) {
+        proc->memoryPages = &sharedResource->freeMemoryArray[originalIndex];
+        while (proc->memoryPages->next != NULL) {
+            proc->memoryPages = proc->memoryPages->next;
+        }
+        proc->hasBeenAllocatedMemory = 1;
+        return 1;
+    }
+    else
+    {
+        proc->hasBeenAllocatedMemory = 0;
+        return 0;
+    }
+}
+
+
 void synchronizedSchedule(sharedRes *sharedResource, process *proc){
+    allocate(sharedResource, proc);
     pthread_mutex_lock(&lock);
     schedule(sharedResource->scheduler, proc, sharedResource->time);
     pthread_mutex_unlock(&lock);
@@ -50,6 +100,10 @@ process* synchronizedNextProcess(fifoscheduler* scheduler){
     process* nextProc = nextProcess(scheduler);
     pthread_mutex_unlock(&lock);
     return nextProc;
+}
+
+int generateRandomNumberOfMemoryPages(){
+    return ((int)rand() % 40) + 2;
 }
 
 /**
@@ -69,6 +123,8 @@ process *generateRandomProcess(double probability, int minRunTime, int maxRunTim
         int runTime = rand() % (maxRunTime - minRunTime) + minRunTime;
         newProc->runTime = runTime;
         newProc->probSystemCall = .1;//give every process the same chance of generating a system call for now but should be random
+        newProc->requiredMemoryPages = generateRandomNumberOfMemoryPages();
+        newProc->hasBeenAllocatedMemory = 0;
         return newProc;
     }
     return NULL;
@@ -206,16 +262,13 @@ void *cpuClock(void *arg){
         pthread_mutex_lock(&lock);
         sharedResource->time++;
         pthread_mutex_unlock(&lock);
-        //printf("Tick: %d \n", t);
         if (!LOAD_PROCESSES_FROM_FILE) {
             // On every tick, randomly choose whether or not to create a process.
             process *proc = generateRandomProcess(0.3, 1, 10, sharedResource);//->time);
             if (proc != NULL && sharedResource->numOfRandGenProcs > 0) {
-                printf("Scheduling process pID: %d entryTime: %d runTime: %d \n", proc->pID, proc->entryTime, proc->runTime);
-                //pthread_mutex_lock(&lock);
+                printf("Scheduling process pID: %d entryTime: %d runTime: %d pages: %d \n", proc->pID, proc->entryTime, proc->runTime, proc->requiredMemoryPages);
                 synchronizedSchedule(sharedResource, proc);
                 sharedResource->numOfRandGenProcs--;
-                //pthread_mutex_unlock(&lock);
             }
         }
         sleep(1);
@@ -267,7 +320,9 @@ void loadProcessesFromFile(char *fileName, sharedRes *sharedResource) {
         else
         {
             newProc->runTime = atoi(buff);
-            newProc->probSystemCall = .1;
+            newProc->probSystemCall = .1; //give every process the same chance of generating a system call for now but should be random
+            newProc->requiredMemoryPages = generateRandomNumberOfMemoryPages();
+            newProc->hasBeenAllocatedMemory = 0;
             insertBack(start, newProc);
             sharedResource->startDataSize++;
         }
@@ -303,6 +358,15 @@ int main(int argc, const char * argv[]) {
     SCHEDULER *scheduler = (SCHEDULER *)malloc(sizeof(SCHEDULER));
     init_scheduler(scheduler);
     
+    page *firstPage = (page *)malloc(sizeof(page));
+    firstPage->startAddress = 0;
+    firstPage->size = NUM_OF_MEM;
+    page freeMemTable[((int)log2(NUM_OF_MEM)) + 1];
+    for (int i = 0; i < ((sizeof(freeMemTable) / sizeof(page)) - 1); i++) {
+        freeMemTable[((int)log2(NUM_OF_MEM)) - 1] = NULL;
+    }
+    freeMemTable[((int)log2(NUM_OF_MEM)) - 1] = *firstPage;
+    
     sharedRes *sharedResource = (sharedRes *) malloc(sizeof(sharedRes));
     sharedResource->scheduler = scheduler;
     sharedResource->time = 0;
@@ -314,6 +378,9 @@ int main(int argc, const char * argv[]) {
     sharedResource->nextPid = 0;
     sharedResource->waitQ = waitQ;
     sharedResource->numOfRandGenProcs = 5;
+    sharedResource->freeMemoryArray = freeMemTable;
+    
+    //NOTE Ready to start generating the number of pages a process needs to execute and figure out hw to give it to them.
     
     pthread_mutex_init(&lock, NULL);
 

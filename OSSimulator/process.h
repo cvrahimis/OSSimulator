@@ -20,7 +20,9 @@ typedef struct Process
     double probSystemCall;
     int timeInterrupt;
     int timeEnteredWaitQ;
-    //int memory;
+    int requiredMemoryPages;
+    int hasBeenAllocatedMemory;
+    struct page *memoryPages;
 } process;
 
 
