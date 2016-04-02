@@ -19,8 +19,8 @@ typedef struct CircularListNode
 } circularlistnode;
 
 void print(circularlistnode *start,circularlistnode *pointer);
-void enqueue(circularlistnode *start, process *data);
-process *dequeue(circularlistnode *start);
+void cll_enqueue(circularlistnode *start, process *data);
+process *cll_dequeue(circularlistnode *start);
 void insertBack(circularlistnode *pointer, process *data);
 //void sort(circularlistnode *start);
 //void insertSorted(circularlistnode *start, process *data);

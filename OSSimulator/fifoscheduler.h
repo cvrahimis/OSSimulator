@@ -11,13 +11,14 @@
 
 #include "CircularLinkedList.h"
 
-typedef struct fifoscheduler {
+typedef struct fifoscheduler
+{
     circularlistnode *readyQueueStart;
     int readyQueueSize;
 } fifoscheduler;
 
-void init_scheduler(fifoscheduler *scheduler);
-void schedule(fifoscheduler *scheduler, process *proc, int time);
-process *nextProcess();
+void fifo_init_scheduler(fifoscheduler *scheduler);
+void fifo_schedule(fifoscheduler *scheduler, process *proc, int time);
+process *fifo_nextProcess();
 
 #endif /* fifoscheduler_h */
