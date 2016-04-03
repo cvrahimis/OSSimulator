@@ -19,7 +19,7 @@
 
 #define MAX_RAND_GEN_PROCS 10
 #define LOAD_PROCESSES_FROM_FILE 0
-#define IS_ROUND_ROBIN 0
+#define IS_ROUND_ROBIN 1
 
 //#define EXECUTION_CONDITION (sharedResource->time < 300)
 #define EXECUTION_CONDITION (sharedResource->doneQSize != MAX_RAND_GEN_PROCS)
@@ -51,7 +51,7 @@ typedef struct resources{
 }sharedRes;
 
 int allocate(sharedRes *sharedResource, process *proc){
-    int originalIndex = ((int)log2(proc->requiredMemoryPages)) + 1;
+    int originalIndex = ceil(log2(proc->requiredMemoryPages));
     int index = originalIndex;
     page *contigiousPages = &sharedResource->freeMemoryArray[index];
     while (contigiousPages == NULL) {
@@ -90,7 +90,8 @@ int allocate(sharedRes *sharedResource, process *proc){
 
 
 void synchronizedSchedule(sharedRes *sharedResource, process *proc){
-    //allocate(sharedResource, proc);
+    //if (!proc->hasBeenAllocatedMemory)
+        //allocate(sharedResource, proc);
     pthread_mutex_lock(&lock);
     pr_schedule(sharedResource->scheduler, proc, sharedResource->time);
     pthread_mutex_unlock(&lock);
@@ -105,6 +106,7 @@ process* synchronizedNextProcess(priorityscheduler* scheduler){
 
 int generateRandomNumberOfMemoryPages(){
     return ((int)rand() % 40) + 2;
+    //return 31;
 }
 
 double generateProbabilityOfSystemCall(double probabilityInteractive)
