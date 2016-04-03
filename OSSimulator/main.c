@@ -17,7 +17,7 @@
 #include "priorityscheduler.h"
 #include "o1scheduler.h"
 
-#define MAX_RAND_GEN_PROCS 10
+#define MAX_RAND_GEN_PROCS 20
 #define LOAD_PROCESSES_FROM_FILE 0
 #define IS_ROUND_ROBIN 1
 
@@ -249,7 +249,7 @@ void *cpuClock(void *arg){
                 sharedResource->numOfRandGenProcs--;
             }
         }
-        usleep(500000);
+        usleep(100000);
     }
     pthread_exit(NULL);
 }
