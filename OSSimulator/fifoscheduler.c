@@ -23,7 +23,8 @@ void fifo_init_scheduler(fifoscheduler *scheduler)
 
 void fifo_schedule(fifoscheduler *scheduler, process *proc, int time)
 {
-    proc->timeEnteredReadyQ = time;
+    if (proc->timeEnteredReadyQ == -1)
+        proc->timeEnteredReadyQ = time;
     scheduler->readyQueueSize++;
     cll_enqueue(scheduler->readyQueueStart, proc);
 }

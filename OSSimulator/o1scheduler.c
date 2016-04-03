@@ -34,7 +34,8 @@ void o1_init_scheduler(o1scheduler *scheduler)
 void o1_schedule(o1scheduler *scheduler, process *proc, int time)
 {
     scheduler->readyQueueSize++;
-    proc->timeEnteredReadyQ = time;
+    if (proc->timeEnteredReadyQ == -1)
+        proc->timeEnteredReadyQ = time;
     int dynamicPriority = processDynamicPriority(proc);
     //printf("dp: %d\n", dynamicPriority);
     cll_enqueue(scheduler->activeProcessQueue[dynamicPriority], proc);

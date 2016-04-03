@@ -134,6 +134,8 @@ process *generateRandomProcess(double probability, int minRunTime, int maxRunTim
         // Randomly choose if we want an interactive process.
         newProc->probSystemCall = generateProbabilityOfSystemCall(PROBABILITY_INTERACTIVE);
         newProc->priority = rand() % MAX_PRIORITY;
+        newProc->timeEnteredCPU = -1;
+        newProc->timeEnteredReadyQ = -1;
         if (IS_ROUND_ROBIN)
             newProc->timeSlice = 4;
         else
@@ -157,7 +159,8 @@ void *cpu(void *arg){
             if (sharedResource->scheduler->readyQueueSize > 0) {
                 currentProcess = synchronizedNextProcess(sharedResource->scheduler);
                 if (currentProcess != NULL) {
-                    currentProcess->timeEnteredCPU = sharedResource->time;
+                    if (currentProcess->timeEnteredCPU == -1)
+                        currentProcess->timeEnteredCPU = sharedResource->time;
                     pthread_mutex_lock(&lock);
                     pthread_mutex_unlock(&lock);
                     printf("Running pID: %d With Run Time: %d Time: %d \n", currentProcess->pID, currentProcess->runTime, sharedResource->time);
