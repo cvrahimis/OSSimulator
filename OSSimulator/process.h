@@ -25,6 +25,8 @@ typedef struct Process
     int requiredMemoryPages;
     int hasBeenAllocatedMemory;
     struct page *memoryPages;
+    int priority;
+    int timeSlice;
 } process;
 
 int processDynamicPriority(process *proc);

@@ -28,7 +28,7 @@ void pr_schedule(priorityscheduler *scheduler, process *proc, int time)
     scheduler->readyQueueSize++;
     proc->timeEnteredReadyQ = time;
     int dynamicPriority = processDynamicPriority(proc);
-    printf("dp: %d\n", dynamicPriority);
+    //printf("dp: %d\n", dynamicPriority);
     cll_enqueue(scheduler->activeProcessQueue[dynamicPriority], proc);
 }
 

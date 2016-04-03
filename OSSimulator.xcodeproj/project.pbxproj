@@ -9,7 +9,6 @@
 /* Begin PBXBuildFile section */
 		140A31BD1CB0567D003B5755 /* priorityscheduler.c in Sources */ = {isa = PBXBuildFile; fileRef = 140A31BB1CB0567D003B5755 /* priorityscheduler.c */; };
 		1479F8261CAC153C00BB98FF /* o1scheduler.c in Sources */ = {isa = PBXBuildFile; fileRef = 1479F8241CAC153C00BB98FF /* o1scheduler.c */; };
-		1479F8281CAC1DBA00BB98FF /* main_backup.c in Sources */ = {isa = PBXBuildFile; fileRef = 1479F8271CAC1DBA00BB98FF /* main_backup.c */; };
 		1479F82A1CAC723000BB98FF /* process.c in Sources */ = {isa = PBXBuildFile; fileRef = 1479F8291CAC723000BB98FF /* process.c */; };
 		14C492A41C8A34F500E5589F /* fifoscheduler.c in Sources */ = {isa = PBXBuildFile; fileRef = 14C492A31C8A34F500E5589F /* fifoscheduler.c */; };
 		D50591F61C7569850030E4C6 /* main.c in Sources */ = {isa = PBXBuildFile; fileRef = D50591F51C7569850030E4C6 /* main.c */; };
@@ -33,7 +32,6 @@
 		140A31BC1CB0567D003B5755 /* priorityscheduler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = priorityscheduler.h; sourceTree = "<group>"; };
 		1479F8241CAC153C00BB98FF /* o1scheduler.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = o1scheduler.c; sourceTree = "<group>"; };
 		1479F8251CAC153C00BB98FF /* o1scheduler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = o1scheduler.h; sourceTree = "<group>"; };
-		1479F8271CAC1DBA00BB98FF /* main_backup.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = main_backup.c; sourceTree = "<group>"; };
 		1479F8291CAC723000BB98FF /* process.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = process.c; sourceTree = "<group>"; };
 		14C492A21C8A34E200E5589F /* fifoscheduler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = fifoscheduler.h; sourceTree = "<group>"; };
 		14C492A31C8A34F500E5589F /* fifoscheduler.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = fifoscheduler.c; sourceTree = "<group>"; };
@@ -77,7 +75,6 @@
 			children = (
 				D5F7C9FB1C76C82F00F19328 /* dataFile.txt */,
 				D50591F51C7569850030E4C6 /* main.c */,
-				1479F8271CAC1DBA00BB98FF /* main_backup.c */,
 				1479F8241CAC153C00BB98FF /* o1scheduler.c */,
 				1479F8251CAC153C00BB98FF /* o1scheduler.h */,
 				14C492A21C8A34E200E5589F /* fifoscheduler.h */,
@@ -151,7 +148,6 @@
 				140A31BD1CB0567D003B5755 /* priorityscheduler.c in Sources */,
 				14C492A41C8A34F500E5589F /* fifoscheduler.c in Sources */,
 				D50591F61C7569850030E4C6 /* main.c in Sources */,
-				1479F8281CAC1DBA00BB98FF /* main_backup.c in Sources */,
 				1479F8261CAC153C00BB98FF /* o1scheduler.c in Sources */,
 				D5F77D381C75F6FF00D5107B /* CircularLinkedList.c in Sources */,
 				1479F82A1CAC723000BB98FF /* process.c in Sources */,

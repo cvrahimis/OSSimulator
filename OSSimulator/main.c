@@ -18,15 +18,17 @@
 #include "o1scheduler.h"
 
 #define LOAD_PROCESSES_FROM_FILE 0
-#define IS_FIFO 0
+#define IS_ROUND_ROBIN 0
 
-//#define EXECUTION_CONDITION (sharedResource->scheduler->readyQueueStart->next != sharedResource->scheduler->readyQueueStart || sharedResource->startData != sharedResource->startData->next  || sharedResource->cpuState == CPU_STATE_RUNNING || sharedResource->doneQ == sharedResource->doneQ->next || (!LOAD_PROCESSES_FROM_FILE && sharedResource->numOfRandGenProcs > 0) || sharedResource->waitQ != sharedResource->waitQ->next)
+//#define EXECUTION_CONDITION (sharedResource->startData != sharedResource->startData->next  || sharedResource->doneQ == sharedResource->doneQ->next || (!LOAD_PROCESSES_FROM_FILE && sharedResource->numOfRandGenProcs > 0) || sharedResource->waitQ != sharedResource->waitQ->next)
+
 #define EXECUTION_CONDITION (sharedResource->time < 300)
+//#define EXECUTION_CONDITION (sharedResource->scheduler->readyQueueStart->next != sharedResource->scheduler->readyQueueStart || sharedResource->startData != sharedResource->startData->next  || sharedResource->cpuState == CPU_STATE_RUNNING || sharedResource->doneQ == sharedResource->doneQ->next || (!LOAD_PROCESSES_FROM_FILE && sharedResource->numOfRandGenProcs > 0) || sharedResource->waitQ != sharedResource->waitQ->next)
 
 #define CPU_STATE_FINISHED 0
 #define CPU_STATE_RUNNING  1
 #define NUM_OF_MEM 128
-
+#define PROBABILITY_INTERACTIVE 0.5
 
 pthread_mutex_t lock;
 
@@ -88,7 +90,7 @@ int allocate(sharedRes *sharedResource, process *proc){
 
 
 void synchronizedSchedule(sharedRes *sharedResource, process *proc){
-    allocate(sharedResource, proc);
+    //allocate(sharedResource, proc);
     pthread_mutex_lock(&lock);
     pr_schedule(sharedResource->scheduler, proc, sharedResource->time);
     pthread_mutex_unlock(&lock);
@@ -103,6 +105,14 @@ process* synchronizedNextProcess(priorityscheduler* scheduler){
 
 int generateRandomNumberOfMemoryPages(){
     return ((int)rand() % 40) + 2;
+}
+
+double generateProbabilityOfSystemCall(double probabilityInteractive)
+{
+    long randMiddle = RAND_MAX / 2;
+    if ((double)rand() / RAND_MAX > probabilityInteractive)
+        return (double)(rand() % randMiddle) / RAND_MAX;
+    return (double)((rand() % randMiddle) + randMiddle) / RAND_MAX;
 }
 
 /**
@@ -121,43 +131,19 @@ process *generateRandomProcess(double probability, int minRunTime, int maxRunTim
         newProc->entryTime = sharedResource->time;//currentTime;
         int runTime = rand() % (maxRunTime - minRunTime) + minRunTime;
         newProc->runTime = runTime;
-        newProc->probSystemCall = .1;//give every process the same chance of generating a system call for now but should be random
+        // Randomly choose if we want an interactive process.
+        newProc->probSystemCall = generateProbabilityOfSystemCall(PROBABILITY_INTERACTIVE);
+        newProc->priority = rand() % MAX_PRIORITY;
+        if (IS_ROUND_ROBIN)
+            newProc->timeSlice = 4;
+        else
+            newProc->timeSlice = (MAX_PRIORITY - newProc->priority) * 2;
         newProc->requiredMemoryPages = generateRandomNumberOfMemoryPages();
         newProc->hasBeenAllocatedMemory = 0;
         return newProc;
     }
     return NULL;
 }
-
-
-
-
-/*
-int main(int argc, char *argv[])
-{
-    process *proc;
-    
-    srand((unsigned int)time(NULL));
-    sharedRes *sharedResource = (sharedRes*)malloc(sizeof(sharedRes));
-    sharedResource->time = 0;
-    sharedResource->nextPid = 0;
-    
-    o1scheduler *scheduler = (o1scheduler*)malloc(sizeof(o1scheduler));
-    o1_init_scheduler(scheduler);
-    
-    proc = generateRandomProcess(1, 1, 10, sharedResource);
-    o1_schedule(scheduler, proc, sharedResource->time);
-    proc = generateRandomProcess(1, 1, 10, sharedResource);
-    o1_schedule(scheduler, proc, sharedResource->time);
-    o1_nextProcess(scheduler);
-    o1_nextProcess(scheduler);
- 
-    return 0;
-}
- */
-
-
-
 
 void *cpu(void *arg){
     sharedRes *sharedResource = (sharedRes *) arg;
@@ -207,11 +193,12 @@ void *cpu(void *arg){
                 }
                 
                 // Round robin
-                if (currentProcess != NULL && currentProcess->timeSlice != -1  && currentProcess->timeSlice <= (sharedResource->time - currentProcess->timeEnteredCPU)){
+                if (IS_ROUND_ROBIN && currentProcess != NULL && currentProcess->timeSlice != -1  && currentProcess->timeSlice <= (sharedResource->time - currentProcess->timeEnteredCPU)){
                         currentProcess->runTime -= currentProcess->timeSlice;
                         if (currentProcess->runTime <= 0){
                             currentProcess->runTime = 0;
                             currentProcess->timeDone = sharedResource->time;
+                            printf("\n PENIS \n");
                             insertBack(sharedResource->doneQ, currentProcess);
                             printf("cpuRR Added pID: %d to the doneQ \n", currentProcess->pID);
                         } else {
@@ -350,7 +337,7 @@ int main(int argc, const char * argv[]) {
     firstPage->size = NUM_OF_MEM;
     page freeMemTable[((int)log2(NUM_OF_MEM)) + 1];
     for (int i = 0; i < ((sizeof(freeMemTable) / sizeof(page)) - 1); i++) {
-        freeMemTable[((int)log2(NUM_OF_MEM)) - 1] = NULL;
+        //freeMemTable[((int)log2(NUM_OF_MEM)) - 1] = NULL;
     }
     freeMemTable[((int)log2(NUM_OF_MEM)) - 1] = *firstPage;
     

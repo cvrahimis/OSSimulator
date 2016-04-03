@@ -36,7 +36,7 @@ void o1_schedule(o1scheduler *scheduler, process *proc, int time)
     scheduler->readyQueueSize++;
     proc->timeEnteredReadyQ = time;
     int dynamicPriority = processDynamicPriority(proc);
-    printf("dp: %d\n", dynamicPriority);
+    //printf("dp: %d\n", dynamicPriority);
     cll_enqueue(scheduler->activeProcessQueue[dynamicPriority], proc);
     scheduler->activeQueueBitMap |= (1 << dynamicPriority);
 }
