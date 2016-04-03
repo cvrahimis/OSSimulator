@@ -136,7 +136,6 @@ process *generateRandomProcess(double probability, int minRunTime, int maxRunTim
         // Randomly choose if we want an interactive process.
         newProc->probSystemCall = generateProbabilityOfSystemCall(PROBABILITY_INTERACTIVE);
         newProc->priority = rand() % MAX_PRIORITY;
-        newProc->timeEnteredCPU = -1;
         newProc->timeEnteredReadyQ = -1;
         if (IS_ROUND_ROBIN)
             newProc->timeSlice = 4;
@@ -161,8 +160,7 @@ void *cpu(void *arg){
             if (sharedResource->scheduler->readyQueueSize > 0) {
                 currentProcess = synchronizedNextProcess(sharedResource->scheduler);
                 if (currentProcess != NULL) {
-                    if (currentProcess->timeEnteredCPU == -1)
-                        currentProcess->timeEnteredCPU = sharedResource->time;
+                    currentProcess->timeEnteredCPU = sharedResource->time;
                     pthread_mutex_lock(&lock);
                     pthread_mutex_unlock(&lock);
                     printf("Running pID: %d With Run Time: %d Time: %d \n", currentProcess->pID, currentProcess->runTime, sharedResource->time);
@@ -243,7 +241,7 @@ void *cpuClock(void *arg){
         pthread_mutex_unlock(&lock);
         if (!LOAD_PROCESSES_FROM_FILE) {
             // On every tick, randomly choose whether or not to create a process.
-            process *proc = generateRandomProcess(0.3, 1, 10, sharedResource);//->time);
+            process *proc = generateRandomProcess(0.3, 3, 100, sharedResource);//->time);
             if (proc != NULL && sharedResource->numOfRandGenProcs > 0) {
                 printf("Scheduling process pID: %d entryTime: %d runTime: %d pages: %d \n", proc->pID, proc->entryTime, proc->runTime, proc->requiredMemoryPages);
                 synchronizedSchedule(sharedResource, proc);
