@@ -172,6 +172,7 @@ void *cpu(void *arg){
             // If the process's run time is up, remove it from the CPU.
             if (currentProcess->runTime <= (sharedResource->time - currentProcess->timeEnteredCPU)) {
                 currentProcess->timeDone = sharedResource->time;
+                currentProcess->runTime = 0;
                 pthread_mutex_lock(&lock);
                 insertBack(sharedResource->doneQ, currentProcess);
                 sharedResource->doneQSize++;

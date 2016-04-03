@@ -102,6 +102,6 @@ void printData(circularlistnode *doneStart, circularlistnode *pointer) {
     {
         return;
     }
-    printf("pid: %d entrytime: %d runtime: %d timeEnteredReadyQ: %d timeComplete: %d totalTimeInSystem: %d\n",(pointer->current)->pID, (pointer->current)->entryTime, (pointer->current)->runTime, (pointer->current)->timeEnteredReadyQ, (pointer->current)->timeDone, pointer->current->timeDone - pointer->current->entryTime);
+    printf("pid: %d entrytime: %d timeEnteredReadyQ: %d timeComplete: %d totalTimeInSystem: %d\n",(pointer->current)->pID, (pointer->current)->entryTime, (pointer->current)->timeEnteredReadyQ, (pointer->current)->timeDone, pointer->current->timeDone - pointer->current->entryTime);
     printData(doneStart, pointer->next);
 }
