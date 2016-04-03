@@ -202,7 +202,6 @@ void *cpu(void *arg){
                         if (currentProcess->runTime <= 0){
                             currentProcess->runTime = 0;
                             currentProcess->timeDone = sharedResource->time;
-                            printf("\n PENIS \n");
                             insertBack(sharedResource->doneQ, currentProcess);
                             sharedResource->doneQSize++;
                             printf("cpuRR Added pID: %d to the doneQ \n", currentProcess->pID);
