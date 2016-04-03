@@ -17,13 +17,12 @@
 #include "priorityscheduler.h"
 #include "o1scheduler.h"
 
+#define MAX_RAND_GEN_PROCS 10
 #define LOAD_PROCESSES_FROM_FILE 0
 #define IS_ROUND_ROBIN 0
 
-//#define EXECUTION_CONDITION (sharedResource->startData != sharedResource->startData->next  || sharedResource->doneQ == sharedResource->doneQ->next || (!LOAD_PROCESSES_FROM_FILE && sharedResource->numOfRandGenProcs > 0) || sharedResource->waitQ != sharedResource->waitQ->next)
-
-#define EXECUTION_CONDITION (sharedResource->time < 300)
-//#define EXECUTION_CONDITION (sharedResource->scheduler->readyQueueStart->next != sharedResource->scheduler->readyQueueStart || sharedResource->startData != sharedResource->startData->next  || sharedResource->cpuState == CPU_STATE_RUNNING || sharedResource->doneQ == sharedResource->doneQ->next || (!LOAD_PROCESSES_FROM_FILE && sharedResource->numOfRandGenProcs > 0) || sharedResource->waitQ != sharedResource->waitQ->next)
+//#define EXECUTION_CONDITION (sharedResource->time < 300)
+#define EXECUTION_CONDITION (sharedResource->doneQSize != MAX_RAND_GEN_PROCS)
 
 #define CPU_STATE_FINISHED 0
 #define CPU_STATE_RUNNING  1
@@ -43,6 +42,7 @@ typedef struct resources{
     int time;
     priorityscheduler *scheduler;
     circularlistnode *doneQ;
+    int doneQSize;
     circularlistnode *waitQ;
     circularlistnode *startData;
     int startDataSize;
@@ -171,6 +171,7 @@ void *cpu(void *arg){
                 currentProcess->timeDone = sharedResource->time;
                 pthread_mutex_lock(&lock);
                 insertBack(sharedResource->doneQ, currentProcess);
+                sharedResource->doneQSize++;
                 pthread_mutex_unlock(&lock);
                 printf("Added pID: %d to the doneQ \n", currentProcess->pID);
                 currentProcess = NULL;
@@ -200,6 +201,7 @@ void *cpu(void *arg){
                             currentProcess->timeDone = sharedResource->time;
                             printf("\n PENIS \n");
                             insertBack(sharedResource->doneQ, currentProcess);
+                            sharedResource->doneQSize++;
                             printf("cpuRR Added pID: %d to the doneQ \n", currentProcess->pID);
                         } else {
                             synchronizedSchedule(sharedResource, currentProcess);
@@ -244,7 +246,7 @@ void *cpuClock(void *arg){
                 sharedResource->numOfRandGenProcs--;
             }
         }
-        sleep(1);
+        usleep(500000);
     }
     pthread_exit(NULL);
 }
@@ -346,10 +348,11 @@ int main(int argc, const char * argv[]) {
     sharedResource->time = 0;
     sharedResource->startDataSize = 0;
     sharedResource->doneQ = doneQ;
+    sharedResource->doneQSize = 0;
     sharedResource->startData = start;
     sharedResource->nextPid = 0;
     sharedResource->waitQ = waitQ;
-    sharedResource->numOfRandGenProcs = 5;
+    sharedResource->numOfRandGenProcs = MAX_RAND_GEN_PROCS;
     sharedResource->freeMemoryArray = freeMemTable;
     
     //NOTE Ready to start generating the number of pages a process needs to execute and figure out hw to give it to them.
