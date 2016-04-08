@@ -29,6 +29,7 @@
 #define CPU_STATE_RUNNING  1
 #define NUM_OF_MEM 1024
 #define PROBABILITY_INTERACTIVE 0.5
+#define TIME_TO_SLEEP 100000
 
 pthread_mutex_t lock;
 
@@ -274,7 +275,7 @@ void *cpuClock(void *arg){
                 sharedResource->numOfRandGenProcs--;
             }
         }
-        usleep(100000);
+        usleep(TIME_TO_SLEEP);
     }
     pthread_exit(NULL);
 }
