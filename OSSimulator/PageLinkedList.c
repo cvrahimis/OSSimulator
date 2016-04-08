@@ -90,8 +90,11 @@ page* getBuddyFree(page *start, int buddyStartAddress){
     while(pointer != start && !found) {
         if (pointer->startAddress == buddyStartAddress) {
             found = 1;
+            removePage(pointer);
         }
-        pointer = pointer->next;
+        else{
+            pointer = pointer->next;
+        }
     }
     if(found)
         return pointer;

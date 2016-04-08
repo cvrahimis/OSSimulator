@@ -140,7 +140,7 @@ void synchronizedSchedule(sharedRes *sharedResource, process *proc){
             cll_enqueue(sharedResource->waitQ, proc);
             pthread_mutex_unlock(&lock);
             if (!proc->printedNotEnoughMem) {
-                printf("Not enough memory for pID: %d, added to the waitQ \n", proc->pID);
+                printf("Not enough memory for pID: %d with requiredPages: %d, added to the waitQ \n", proc->pID, proc->requiredMemoryPages);
                 proc->printedNotEnoughMem = 1;
             }
         }
@@ -220,7 +220,7 @@ void *cpu(void *arg){
                     currentProcess->timeEnteredCPU = sharedResource->time;
                     pthread_mutex_lock(&lock);
                     pthread_mutex_unlock(&lock);
-                    printf("Running pID: %d With Run Time: %d Time: %d \n", currentProcess->pID, currentProcess->runTime, sharedResource->time);
+                    printf("Running pID: %d With Run Time: %d Time: %d Priority: %d \n", currentProcess->pID, currentProcess->runTime, sharedResource->time, currentProcess->priority);
                 }
             }
         }
@@ -282,7 +282,7 @@ void *cpu(void *arg){
                 removeNode(pointer);
                 pointer->current->timeInterrupt = 0;
                 synchronizedSchedule(sharedResource, pointer->current);
-                printf("TEST  Added pID: %d back to the readyQ \n", pointer->current->pID);
+                printf("Added pID: %d back to the readyQ \n", pointer->current->pID);
             }
             pointer = pointer->next;
         }
