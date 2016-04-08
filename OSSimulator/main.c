@@ -11,6 +11,7 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <math.h>
+#include "PageLinkedList.h"
 #include "CircularLinkedList.h"
 
 #include "fifoscheduler.h"
@@ -26,16 +27,12 @@
 
 #define CPU_STATE_FINISHED 0
 #define CPU_STATE_RUNNING  1
-#define NUM_OF_MEM 128
+#define NUM_OF_MEM 1024
 #define PROBABILITY_INTERACTIVE 0.5
 
 pthread_mutex_t lock;
 
-typedef struct page{
-    int startAddress;
-    int size;
-    struct page *next;
-}page;
+
 
 typedef struct resources{
     int nextPid;
@@ -47,54 +44,82 @@ typedef struct resources{
     circularlistnode *startData;
     int startDataSize;
     int numOfRandGenProcs;
-    page *freeMemoryArray;
+    pagePointer *freeMemoryArray;
 }sharedRes;
+
+
+/*debug method*/
+void printMemoryTable(sharedRes *sharedResource){
+    
+    for (int i = 0; i < ((int)ceil(log2(NUM_OF_MEM))) + 1; i++) {
+        page *page = sharedResource->freeMemoryArray[i];
+        printPages(page, i);
+    }
+    printf("\n=====================================\n");
+}
 
 int allocate(sharedRes *sharedResource, process *proc){
     int originalIndex = ceil(log2(proc->requiredMemoryPages));
     int index = originalIndex;
-    page *contigiousPages = &sharedResource->freeMemoryArray[index];
-    while (contigiousPages == NULL) {
+    
+    printMemoryTable(sharedResource);
+    
+    page *contigiousPages = sharedResource->freeMemoryArray[index];
+    while (index < (ceil(log2(NUM_OF_MEM)) + 1) && contigiousPages->next == contigiousPages && contigiousPages->prev == contigiousPages) {
         index++;
-        contigiousPages = &sharedResource->freeMemoryArray[index];
+        contigiousPages = sharedResource->freeMemoryArray[index];
     }
-    page* currentPage = contigiousPages;
-    while(originalIndex <= index)
+    if (index == (ceil(log2(NUM_OF_MEM)) + 1)) {
+        proc->hasBeenAllocatedMemory = 0;
+        return 0;
+    }
+
+    while(originalIndex < index)
     {
-        index--;
-        int buddySize = contigiousPages->size / 2;
+        page *currentPage = removeFrontPage(contigiousPages);
+        int buddySize = currentPage->size / 2;
         page *buddy1 = (page *)malloc(sizeof(page));
         buddy1->startAddress = currentPage->startAddress;
         buddy1->size = buddySize;
         page *buddy2 = (page *)malloc(sizeof(page));
         buddy2->startAddress = buddy1->startAddress + buddy1->size;
         buddy2->size = buddySize;
-        buddy1->next = buddy2;
-        sharedResource->freeMemoryArray[index] = *buddy1;
-        currentPage = buddy1;
+        insertPageSorted(sharedResource->freeMemoryArray[(int)ceil(log2(buddySize))], buddy1);
+        insertPageSorted(sharedResource->freeMemoryArray[(int)ceil(log2(buddySize))], buddy2);
+        free(currentPage);
+        printMemoryTable(sharedResource);
+        index--;
+        contigiousPages = sharedResource->freeMemoryArray[index];
     }
-    if (&sharedResource->freeMemoryArray[originalIndex] != NULL) {
-        proc->memoryPages = &sharedResource->freeMemoryArray[originalIndex];
-        while (proc->memoryPages->next != NULL) {
-            proc->memoryPages = proc->memoryPages->next;
+    proc->memoryPages = removeFrontPage(sharedResource->freeMemoryArray[index]);
+    proc->hasBeenAllocatedMemory = 1;
+    return 1;
+    
+}
+
+void synchronizedSchedule(sharedRes *sharedResource, process *proc){
+    if (!proc->hasBeenAllocatedMemory)
+    {
+        if(allocate(sharedResource, proc))
+        {
+            pthread_mutex_lock(&lock);
+            pr_schedule(sharedResource->scheduler, proc, sharedResource->time);
+            pthread_mutex_unlock(&lock);
         }
-        proc->hasBeenAllocatedMemory = 1;
-        return 1;
+        else
+        {
+            pthread_mutex_lock(&lock);
+            cll_enqueue(sharedResource->waitQ, proc);
+            pthread_mutex_unlock(&lock);
+            printf("Not enough memory for pID: %d, added to the waitQ \n", proc->pID);
+        }
     }
     else
     {
-        proc->hasBeenAllocatedMemory = 0;
-        return 0;
+        pthread_mutex_lock(&lock);
+        pr_schedule(sharedResource->scheduler, proc, sharedResource->time);
+        pthread_mutex_unlock(&lock);
     }
-}
-
-
-void synchronizedSchedule(sharedRes *sharedResource, process *proc){
-    //if (!proc->hasBeenAllocatedMemory)
-        //allocate(sharedResource, proc);
-    pthread_mutex_lock(&lock);
-    pr_schedule(sharedResource->scheduler, proc, sharedResource->time);
-    pthread_mutex_unlock(&lock);
 }
 
 process* synchronizedNextProcess(priorityscheduler* scheduler){
@@ -219,7 +244,7 @@ void *cpu(void *arg){
         circularlistnode *pointer = sharedResource->waitQ->next;
         while(pointer != sharedResource->waitQ)
         {
-            if (pointer->current->timeInterrupt <= (sharedResource->time - pointer->current->timeEnteredWaitQ)) {
+            if ((pointer->current->timeInterrupt <= (sharedResource->time - pointer->current->timeEnteredWaitQ)) || (!pointer->current->hasBeenAllocatedMemory && allocate(sharedResource, pointer->current))) {
                 removeNode(pointer);
                 pointer->current->timeInterrupt = 0;
                 synchronizedSchedule(sharedResource, pointer->current);
@@ -244,7 +269,7 @@ void *cpuClock(void *arg){
             // On every tick, randomly choose whether or not to create a process.
             process *proc = generateRandomProcess(0.3, 3, 100, sharedResource);//->time);
             if (proc != NULL && sharedResource->numOfRandGenProcs > 0) {
-                printf("Scheduling process pID: %d entryTime: %d runTime: %d pages: %d \n", proc->pID, proc->entryTime, proc->runTime, proc->requiredMemoryPages);
+                printf("\nScheduling process pID: %d entryTime: %d runTime: %d pages: %d \n", proc->pID, proc->entryTime, proc->runTime, proc->requiredMemoryPages);
                 synchronizedSchedule(sharedResource, proc);
                 sharedResource->numOfRandGenProcs--;
             }
@@ -337,14 +362,24 @@ int main(int argc, const char * argv[]) {
     priorityscheduler *scheduler = (priorityscheduler *)malloc(sizeof(priorityscheduler));
     pr_init_scheduler(scheduler);
     
+    //int size = (int)ceil(log2(NUM_OF_MEM));
+    pagePointer freeMemTable[((int)ceil(log2(NUM_OF_MEM))) + 1];
+    
+    for (int i = 0; i < ((int)ceil(log2(NUM_OF_MEM))) + 1; i++) {
+        page *start = (page *) malloc(sizeof(page));
+        start->next = start;
+        start->prev = start;
+        freeMemTable[i] = start;
+    }
+    
     page *firstPage = (page *)malloc(sizeof(page));
     firstPage->startAddress = 0;
     firstPage->size = NUM_OF_MEM;
-    page freeMemTable[((int)log2(NUM_OF_MEM)) + 1];
-    for (int i = 0; i < ((sizeof(freeMemTable) / sizeof(page)) - 1); i++) {
-        //freeMemTable[((int)log2(NUM_OF_MEM)) - 1] = NULL;
-    }
-    freeMemTable[((int)log2(NUM_OF_MEM)) - 1] = *firstPage;
+
+    freeMemTable[((int)log2(NUM_OF_MEM))]->next = firstPage;
+    freeMemTable[((int)log2(NUM_OF_MEM))]->prev = firstPage;
+    firstPage->next = freeMemTable[((int)log2(NUM_OF_MEM))];
+    firstPage->prev = freeMemTable[((int)log2(NUM_OF_MEM))];
     
     sharedRes *sharedResource = (sharedRes *) malloc(sizeof(sharedRes));
     sharedResource->scheduler = scheduler;
