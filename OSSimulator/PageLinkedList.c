@@ -75,3 +75,26 @@ page* removeFrontPage(page *start){
     else
         return NULL;
 }
+
+void removePage(page *node){
+    page *previous = node->prev;
+    page *next = node->next;
+    
+    previous->next = next;
+    next->prev = previous;
+}
+
+page* getBuddyFree(page *start, int buddyStartAddress){
+    page *pointer = start->next;
+    int found = 0;
+    while(pointer != start && !found) {
+        if (pointer->startAddress == buddyStartAddress) {
+            found = 1;
+        }
+        pointer = pointer->next;
+    }
+    if(found)
+        return pointer;
+    else
+        return NULL;
+}

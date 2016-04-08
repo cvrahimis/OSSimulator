@@ -18,7 +18,7 @@
 #include "priorityscheduler.h"
 #include "o1scheduler.h"
 
-#define MAX_RAND_GEN_PROCS 20
+#define MAX_RAND_GEN_PROCS 10
 #define LOAD_PROCESSES_FROM_FILE 0
 #define IS_ROUND_ROBIN 1
 
@@ -27,13 +27,12 @@
 
 #define CPU_STATE_FINISHED 0
 #define CPU_STATE_RUNNING  1
-#define NUM_OF_MEM 1024
+#define NUM_OF_MEM 256
 #define PROBABILITY_INTERACTIVE 0.5
 #define TIME_TO_SLEEP 100000
+#define MIN(a, b) (((a) < (b)) ? (a) : (b))
 
 pthread_mutex_t lock;
-
-
 
 typedef struct resources{
     int nextPid;
@@ -59,11 +58,40 @@ void printMemoryTable(sharedRes *sharedResource){
     printf("\n=====================================\n");
 }
 
+void sycronizedInsertPage(sharedRes *sharedResource, page *pages, int size){
+    pthread_mutex_lock(&lock);
+    insertPageSorted(sharedResource->freeMemoryArray[(int)ceil(log2(size))], pages);
+    pthread_mutex_unlock(&lock);
+}
+
+void deallocate(sharedRes *sharedResource, process *proc){
+    printf("\n");
+    printMemoryTable(sharedResource);
+    page *procPages = proc->memoryPages;
+    int shifts = (int)ceil(log2(procPages->size));
+    int comp = 1 << shifts;
+    int buddyStartAddress = comp ^ procPages->startAddress;
+    page *buddy = getBuddyFree(sharedResource->freeMemoryArray[shifts], buddyStartAddress);
+    if (buddy != NULL) {
+        buddy->startAddress = MIN(buddy->startAddress, procPages->startAddress);
+        buddy->size = buddy->size + procPages->size;
+        free(proc->memoryPages);
+        proc->memoryPages = buddy;
+        deallocate(sharedResource, proc);
+    }
+    else
+    {
+        sycronizedInsertPage(sharedResource, proc->memoryPages, proc->memoryPages->size);
+        printf("Deallocating Mem for pID: %d and memStart: %d memSize: %d \n", proc->pID, proc->memoryPages->startAddress, proc->memoryPages->size);
+        printMemoryTable(sharedResource);
+    }
+}
+
 int allocate(sharedRes *sharedResource, process *proc){
     int originalIndex = ceil(log2(proc->requiredMemoryPages));
     int index = originalIndex;
-    
-    printMemoryTable(sharedResource);
+    if (!proc->printedNotEnoughMem)
+        printMemoryTable(sharedResource);
     
     page *contigiousPages = sharedResource->freeMemoryArray[index];
     while (index < (ceil(log2(NUM_OF_MEM)) + 1) && contigiousPages->next == contigiousPages && contigiousPages->prev == contigiousPages) {
@@ -85,17 +113,16 @@ int allocate(sharedRes *sharedResource, process *proc){
         page *buddy2 = (page *)malloc(sizeof(page));
         buddy2->startAddress = buddy1->startAddress + buddy1->size;
         buddy2->size = buddySize;
-        insertPageSorted(sharedResource->freeMemoryArray[(int)ceil(log2(buddySize))], buddy1);
-        insertPageSorted(sharedResource->freeMemoryArray[(int)ceil(log2(buddySize))], buddy2);
+        sycronizedInsertPage(sharedResource, buddy1, buddy1->size);
+        sycronizedInsertPage(sharedResource, buddy2, buddy2->size);
         free(currentPage);
-        printMemoryTable(sharedResource);
+        //printMemoryTable(sharedResource); DEBUG
         index--;
         contigiousPages = sharedResource->freeMemoryArray[index];
     }
     proc->memoryPages = removeFrontPage(sharedResource->freeMemoryArray[index]);
     proc->hasBeenAllocatedMemory = 1;
     return 1;
-    
 }
 
 void synchronizedSchedule(sharedRes *sharedResource, process *proc){
@@ -112,7 +139,10 @@ void synchronizedSchedule(sharedRes *sharedResource, process *proc){
             pthread_mutex_lock(&lock);
             cll_enqueue(sharedResource->waitQ, proc);
             pthread_mutex_unlock(&lock);
-            printf("Not enough memory for pID: %d, added to the waitQ \n", proc->pID);
+            if (!proc->printedNotEnoughMem) {
+                printf("Not enough memory for pID: %d, added to the waitQ \n", proc->pID);
+                proc->printedNotEnoughMem = 1;
+            }
         }
     }
     else
@@ -169,6 +199,7 @@ process *generateRandomProcess(double probability, int minRunTime, int maxRunTim
             newProc->timeSlice = (MAX_PRIORITY - newProc->priority) * 2;
         newProc->requiredMemoryPages = generateRandomNumberOfMemoryPages();
         newProc->hasBeenAllocatedMemory = 0;
+        newProc->printedNotEnoughMem = 0;
         return newProc;
     }
     return NULL;
@@ -199,6 +230,7 @@ void *cpu(void *arg){
             if (currentProcess->runTime <= (sharedResource->time - currentProcess->timeEnteredCPU)) {
                 currentProcess->timeDone = sharedResource->time;
                 currentProcess->runTime = 0;
+                deallocate(sharedResource, currentProcess);
                 pthread_mutex_lock(&lock);
                 insertBack(sharedResource->doneQ, currentProcess);
                 sharedResource->doneQSize++;
@@ -229,6 +261,7 @@ void *cpu(void *arg){
                         if (currentProcess->runTime <= 0){
                             currentProcess->runTime = 0;
                             currentProcess->timeDone = sharedResource->time;
+                            deallocate(sharedResource, currentProcess);
                             insertBack(sharedResource->doneQ, currentProcess);
                             sharedResource->doneQSize++;
                             printf("cpuRR Added pID: %d to the doneQ \n", currentProcess->pID);
@@ -245,11 +278,11 @@ void *cpu(void *arg){
         circularlistnode *pointer = sharedResource->waitQ->next;
         while(pointer != sharedResource->waitQ)
         {
-            if ((pointer->current->timeInterrupt <= (sharedResource->time - pointer->current->timeEnteredWaitQ)) || (!pointer->current->hasBeenAllocatedMemory && allocate(sharedResource, pointer->current))) {
+            if ((pointer->current->timeInterrupt <= (sharedResource->time - pointer->current->timeEnteredWaitQ) && pointer->current->hasBeenAllocatedMemory) || (!pointer->current->hasBeenAllocatedMemory && allocate(sharedResource, pointer->current))) {
                 removeNode(pointer);
                 pointer->current->timeInterrupt = 0;
                 synchronizedSchedule(sharedResource, pointer->current);
-                printf("Added pID: %d back to the readyQ \n", pointer->current->pID);
+                printf("TEST  Added pID: %d back to the readyQ \n", pointer->current->pID);
             }
             pointer = pointer->next;
         }

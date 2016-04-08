@@ -31,6 +31,8 @@ void insertPageSorted(page *start, page *newPage);
 //void del(page *pointer, page pID);
 page* removeFrontPage(page *start);
 page* removeBackPage(page *start);
+page* getBuddyFree(page *start, int buddyStartAddress);
+void removePage(page *node);
 //circularlistnode * locate(circularlistnode *start, int key);
 //int size();
 //page* getNextPage(page *start);

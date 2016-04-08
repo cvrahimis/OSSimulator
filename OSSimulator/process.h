@@ -27,6 +27,7 @@ typedef struct Process
     struct page *memoryPages;
     int priority;
     int timeSlice;
+    int printedNotEnoughMem;
 } process;
 
 int processDynamicPriority(process *proc);
