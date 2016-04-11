@@ -18,7 +18,7 @@
 #include "priorityscheduler.h"
 #include "o1scheduler.h"
 
-#define MAX_RAND_GEN_PROCS 10
+#define MAX_RAND_GEN_PROCS 15
 #define LOAD_PROCESSES_FROM_FILE 0
 #define IS_ROUND_ROBIN 1
 
