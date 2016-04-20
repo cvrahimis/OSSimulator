@@ -13,7 +13,8 @@ int processDynamicPriority(process *proc)
     if (!proc)
         return -1;
     int dynamicPriority = proc->priority;
-    if (proc->probSystemCall > INTERACTIVE_THRESHOLD)
+    //if (proc->probSystemCall > INTERACTIVE_THRESHOLD)
+    if (proc->isInteractive)
         dynamicPriority = dynamicPriority > 0 ? dynamicPriority - 1 : dynamicPriority;
     return dynamicPriority;
 }

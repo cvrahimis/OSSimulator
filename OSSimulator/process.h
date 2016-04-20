@@ -9,6 +9,7 @@
 #ifndef process_h
 #define process_h
 
+#include <stdbool.h>
 #define INTERACTIVE_THRESHOLD 0.5
 
 typedef struct Process
@@ -16,6 +17,7 @@ typedef struct Process
     int pID;
     int entryTime;
     int runTime;
+    int runTimeRemaining;
     int timeEnteredReadyQ;
     int timeEnteredCPU;
     int timeDone;
@@ -28,6 +30,11 @@ typedef struct Process
     int priority;
     int timeSlice;
     int printedNotEnoughMem;
+    // For OS to determine if
+    // process is interactive.
+    bool isInteractive;
+    int timeAllotted;
+    int timeSystemCall;
 } process;
 
 int processDynamicPriority(process *proc);

@@ -20,13 +20,11 @@
 
 #define MAX_RAND_GEN_PROCS 15
 #define LOAD_PROCESSES_FROM_FILE 0
-#define IS_ROUND_ROBIN 1
+#define IS_ROUND_ROBIN 0
 
 //#define EXECUTION_CONDITION (sharedResource->time < 300)
 #define EXECUTION_CONDITION (sharedResource->doneQSize != MAX_RAND_GEN_PROCS)
 
-#define CPU_STATE_FINISHED 0
-#define CPU_STATE_RUNNING  1
 #define NUM_OF_MEM 256
 #define PROBABILITY_INTERACTIVE 0.5
 #define TIME_TO_SLEEP 100000
@@ -58,7 +56,7 @@ void printMemoryTable(sharedRes *sharedResource){
     printf("\n=====================================\n");
 }
 
-void sycronizedInsertPage(sharedRes *sharedResource, page *pages, int size){
+void synchronizedInsertPage(sharedRes *sharedResource, page *pages, int size){
     pthread_mutex_lock(&lock);
     insertPageSorted(sharedResource->freeMemoryArray[(int)ceil(log2(size))], pages);
     pthread_mutex_unlock(&lock);
@@ -81,7 +79,7 @@ void deallocate(sharedRes *sharedResource, process *proc){
     }
     else
     {
-        sycronizedInsertPage(sharedResource, proc->memoryPages, proc->memoryPages->size);
+        synchronizedInsertPage(sharedResource, proc->memoryPages, proc->memoryPages->size);
         printf("Deallocating Mem for pID: %d and memStart: %d memSize: %d \n", proc->pID, proc->memoryPages->startAddress, proc->memoryPages->size);
         printMemoryTable(sharedResource);
     }
@@ -113,8 +111,8 @@ int allocate(sharedRes *sharedResource, process *proc){
         page *buddy2 = (page *)malloc(sizeof(page));
         buddy2->startAddress = buddy1->startAddress + buddy1->size;
         buddy2->size = buddySize;
-        sycronizedInsertPage(sharedResource, buddy1, buddy1->size);
-        sycronizedInsertPage(sharedResource, buddy2, buddy2->size);
+        synchronizedInsertPage(sharedResource, buddy1, buddy1->size);
+        synchronizedInsertPage(sharedResource, buddy2, buddy2->size);
         free(currentPage);
         //printMemoryTable(sharedResource); DEBUG
         index--;
@@ -186,9 +184,10 @@ process *generateRandomProcess(double probability, int minRunTime, int maxRunTim
         pthread_mutex_lock(&lock);
         newProc->pID = sharedResource->nextPid++;
         pthread_mutex_unlock(&lock);
-        newProc->entryTime = sharedResource->time;//currentTime;
+        newProc->entryTime = sharedResource->time;
         int runTime = rand() % (maxRunTime - minRunTime) + minRunTime;
         newProc->runTime = runTime;
+        newProc->runTimeRemaining = runTime;
         // Randomly choose if we want an interactive process.
         newProc->probSystemCall = generateProbabilityOfSystemCall(PROBABILITY_INTERACTIVE);
         newProc->priority = rand() % MAX_PRIORITY;
@@ -200,6 +199,7 @@ process *generateRandomProcess(double probability, int minRunTime, int maxRunTim
         newProc->requiredMemoryPages = generateRandomNumberOfMemoryPages();
         newProc->hasBeenAllocatedMemory = 0;
         newProc->printedNotEnoughMem = 0;
+        newProc->isInteractive = false;
         return newProc;
     }
     return NULL;
@@ -220,16 +220,16 @@ void *cpu(void *arg){
                     currentProcess->timeEnteredCPU = sharedResource->time;
                     pthread_mutex_lock(&lock);
                     pthread_mutex_unlock(&lock);
-                    printf("Running pID: %d With Run Time: %d Time: %d Priority: %d \n", currentProcess->pID, currentProcess->runTime, sharedResource->time, currentProcess->priority);
+                    printf("Running pID: %d With Run Time Remaining: %d Time: %d Priority: %d \n", currentProcess->pID, currentProcess->runTimeRemaining, sharedResource->time, currentProcess->priority);
                 }
             }
         }
         // Otherwise, if a process is running...
         else {
             // If the process's run time is up, remove it from the CPU.
-            if (currentProcess->runTime <= (sharedResource->time - currentProcess->timeEnteredCPU)) {
+            if (currentProcess->runTimeRemaining <= (sharedResource->time - currentProcess->timeEnteredCPU)) {
                 currentProcess->timeDone = sharedResource->time;
-                currentProcess->runTime = 0;
+                currentProcess->runTimeRemaining = 0;
                 deallocate(sharedResource, currentProcess);
                 pthread_mutex_lock(&lock);
                 insertBack(sharedResource->doneQ, currentProcess);
@@ -244,9 +244,24 @@ void *cpu(void *arg){
                 if (oldTime != sharedResource->time) {
                     double randomValue = (double)rand() / RAND_MAX;
                     if (randomValue < currentProcess->probSystemCall) {
-                        int updatedRunTime = (currentProcess->runTime - (sharedResource->time - currentProcess->timeEnteredCPU));
-                        currentProcess->runTime = updatedRunTime < 0 ? 0 : updatedRunTime; //making sure the runTime cannot be negative
-                        
+                        // Determine whether or not the process
+                        // should be classified as interactive.
+                        currentProcess->timeSystemCall++;
+                        // Don't bother calculating anything unless
+                        // it has already run a few times, because
+                        // otherwise it doesn't mean much.
+                        if (currentProcess->timeAllotted > 5) {
+                            double systemCallRatio = (double)currentProcess->timeSystemCall / currentProcess->timeAllotted;
+                            if (!currentProcess->isInteractive && systemCallRatio > INTERACTIVE_THRESHOLD) {
+                                currentProcess->isInteractive = true;
+                                printf("pId %d flagged as interactive\n", currentProcess->pID);
+                            } else if (currentProcess->isInteractive && systemCallRatio <= INTERACTIVE_THRESHOLD) {
+                                currentProcess->isInteractive = false;
+                                printf("pId %d interactive flag removed\n", currentProcess->pID);
+                            }
+                        }
+                        int updatedRunTime = (currentProcess->runTimeRemaining - (sharedResource->time - currentProcess->timeEnteredCPU));
+                        currentProcess->runTimeRemaining = updatedRunTime < 0 ? 0 : updatedRunTime; //making sure the runTime cannot be negative
                         currentProcess->timeInterrupt = ((int)rand() % 6) + 3;//setting the time it takes for the interrupt to complete
                         currentProcess->timeEnteredWaitQ = sharedResource->time;
                         cll_enqueue(sharedResource->waitQ, currentProcess);
@@ -255,11 +270,12 @@ void *cpu(void *arg){
                     }
                 }
                 
-                // Round robin
-                if (IS_ROUND_ROBIN && currentProcess != NULL && currentProcess->timeSlice != -1  && currentProcess->timeSlice <= (sharedResource->time - currentProcess->timeEnteredCPU)){
-                        currentProcess->runTime -= currentProcess->timeSlice;
-                        if (currentProcess->runTime <= 0){
-                            currentProcess->runTime = 0;
+                // Round robin / Time slice
+                // Time slice of -1 means no limit.
+                if (currentProcess != NULL && currentProcess->timeSlice != -1  && currentProcess->timeSlice <= (sharedResource->time - currentProcess->timeEnteredCPU)){
+                        currentProcess->runTimeRemaining -= currentProcess->timeSlice;
+                        if (currentProcess->runTimeRemaining <= 0){
+                            currentProcess->runTimeRemaining = 0;
                             currentProcess->timeDone = sharedResource->time;
                             deallocate(sharedResource, currentProcess);
                             insertBack(sharedResource->doneQ, currentProcess);
