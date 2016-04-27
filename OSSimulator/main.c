@@ -18,18 +18,15 @@
 #include "priorityscheduler.h"
 #include "o1scheduler.h"
 
+//#define MAX_RAND_GEN_PROCS 15
+//#define IS_ROUND_ROBIN 0
+
 //#define EXECUTION_CONDITION (sharedResource->time < 300)
-//#define EXECUTION_CONDITION (sharedResource->doneQSize != MAX_RAND_GEN_PROCS)
 #define EXECUTION_CONDITION (sharedResource->doneQSize != sharedResource->properties->maxRandGenProcs)
 
-
-/*
-#define MAX_RAND_GEN_PROCS 15
-#define IS_ROUND_ROBIN 0
-#define NUM_OF_MEM 256
-#define PROBABILITY_INTERACTIVE 0.5
+//#define NUM_OF_MEM 256
+//#define PROBABILITY_INTERACTIVE 0.5
 #define TIME_TO_SLEEP 100000
-*/
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 
 pthread_mutex_t lock;
@@ -57,8 +54,6 @@ typedef struct resources{
     circularlistnode *doneQ;
     int doneQSize;
     circularlistnode *waitQ;
-    circularlistnode *startData;
-    int startDataSize;
     int numOfRandGenProcs;
     pagePointer *freeMemoryArray;
     systemProperties *properties;
@@ -341,7 +336,7 @@ void *cpuClock(void *arg){
             synchronizedSchedule(sharedResource, proc);
             sharedResource->numOfRandGenProcs--;
         }
-        usleep(sharedResource->properties->timeToSleep);
+        usleep(TIME_TO_SLEEP);
     }
     pthread_exit(NULL);
 }
@@ -366,7 +361,6 @@ systemProperties *loadPropertiesFromFile(const char *fileName) {
     return properties;
 }
 
-
 int main(int argc, const char * argv[]) {
     int rc;
     pthread_t clockThread;
@@ -388,25 +382,11 @@ int main(int argc, const char * argv[]) {
     waitQ -> prev = waitQ;
     
     sharedRes *sharedResource = (sharedRes *) malloc(sizeof(sharedRes));
-    sharedResource->time = 0;
-    sharedResource->startDataSize = 0;
-    sharedResource->doneQ = doneQ;
-    sharedResource->doneQSize = 0;
-    sharedResource->startData = start;
-    sharedResource->nextPid = 0;
-    sharedResource->waitQ = waitQ;
     sharedResource->properties = loadPropertiesFromFile(argv[1]);
-    if (sharedResource->properties == NULL)
-    {
-        printf("Unable to read system properties. Cannot run simulation.\n");
-        return 1;
-    }
-    sharedResource->numOfRandGenProcs = sharedResource->properties->maxRandGenProcs;
     
     priorityscheduler *scheduler = (priorityscheduler *)malloc(sizeof(priorityscheduler));
     pr_init_scheduler(scheduler, sharedResource->properties->maxPriority);
-    sharedResource->scheduler = scheduler;
-
+    
     //int size = (int)ceil(log2(NUM_OF_MEM));
     pagePointer freeMemTable[((int)ceil(log2(sharedResource->properties->numMemoryBlocks))) + 1];
     
@@ -426,6 +406,18 @@ int main(int argc, const char * argv[]) {
     firstPage->next = freeMemTable[((int)log2(sharedResource->properties->numMemoryBlocks))];
     firstPage->prev = freeMemTable[((int)log2(sharedResource->properties->numMemoryBlocks))];
     
+    sharedResource->scheduler = scheduler;
+    sharedResource->time = 0;
+    sharedResource->doneQ = doneQ;
+    sharedResource->doneQSize = 0;
+    sharedResource->nextPid = 0;
+    sharedResource->waitQ = waitQ;
+    if (sharedResource->properties == NULL)
+    {
+        printf("Unable to read system properties. Cannot run simulation.\n");
+        return 1;
+    }
+    sharedResource->numOfRandGenProcs = sharedResource->properties->maxRandGenProcs;
     sharedResource->freeMemoryArray = freeMemTable;
     
     //NOTE Ready to start generating the number of pages a process needs to execute and figure out hw to give it to them.

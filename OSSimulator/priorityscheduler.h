@@ -9,8 +9,6 @@
 #ifndef prscheduler_h
 #define prscheduler_h
 
-//#define MAX_PRIORITY 5
-
 #include "CircularLinkedList.h"
 
 typedef struct priorityscheduler

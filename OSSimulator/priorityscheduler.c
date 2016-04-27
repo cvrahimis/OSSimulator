@@ -11,6 +11,7 @@
 
 void pr_init_scheduler(priorityscheduler *scheduler, int maxPriority)
 {
+    scheduler->maxPriority = maxPriority;
     scheduler->readyQueueSize = 0;
     scheduler->activeProcessQueue  = (circularlistnode**)malloc(sizeof(circularlistnode*)*maxPriority);
     
@@ -20,6 +21,7 @@ void pr_init_scheduler(priorityscheduler *scheduler, int maxPriority)
         scheduler->activeProcessQueue[i]->next = scheduler->activeProcessQueue[i];
         scheduler->activeProcessQueue[i]->prev = scheduler->activeProcessQueue[i];
     }
+    
 }
 
 void pr_schedule(priorityscheduler *scheduler, process *proc, int time)
