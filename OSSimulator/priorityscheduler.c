@@ -9,18 +9,17 @@
 #include "priorityscheduler.h"
 #include <stdlib.h>
 
-void pr_init_scheduler(priorityscheduler *scheduler)
+void pr_init_scheduler(priorityscheduler *scheduler, int maxPriority)
 {
     scheduler->readyQueueSize = 0;
-    scheduler->activeProcessQueue  = (circularlistnode**)malloc(sizeof(circularlistnode*)*MAX_PRIORITY);
+    scheduler->activeProcessQueue  = (circularlistnode**)malloc(sizeof(circularlistnode*)*maxPriority);
     
-    for (int i = 0; i < MAX_PRIORITY; i++)
+    for (int i = 0; i < maxPriority; i++)
     {
         scheduler->activeProcessQueue[i] = (circularlistnode*)malloc(sizeof(circularlistnode));
         scheduler->activeProcessQueue[i]->next = scheduler->activeProcessQueue[i];
         scheduler->activeProcessQueue[i]->prev = scheduler->activeProcessQueue[i];
     }
-    
 }
 
 void pr_schedule(priorityscheduler *scheduler, process *proc, int time)
@@ -41,7 +40,7 @@ process *pr_nextProcess(priorityscheduler *scheduler)
     
     // Run through all the active queues and get the first
     // process from the lowest priority queue.
-    for (int i = 0; i < MAX_PRIORITY; i++)
+    for (int i = 0; i < scheduler->maxPriority; i++)
     {
         if (scheduler->activeProcessQueue[i]->next->current)
         {

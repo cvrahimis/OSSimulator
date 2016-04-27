@@ -9,8 +9,6 @@
 #ifndef o1scheduler_h
 #define o1scheduler_h
 
-#define MAX_PRIORITY 5
-
 #include "CircularLinkedList.h"
 
 typedef struct o1scheduler
@@ -20,9 +18,10 @@ typedef struct o1scheduler
     int activeQueueBitMap;
     int expiredQueueBitMap;
     int readyQueueSize;
+    int maxPriority;
 } o1scheduler;
 
-void o1_init_scheduler(o1scheduler *scheduler);
+void o1_init_scheduler(o1scheduler *scheduler, int maxPriority);
 void o1_schedule(o1scheduler *scheduler, process *data, int time);
 process *o1_nextProcess(o1scheduler *scheduler);
 

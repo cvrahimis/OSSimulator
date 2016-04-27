@@ -18,19 +18,37 @@
 #include "priorityscheduler.h"
 #include "o1scheduler.h"
 
-#define MAX_RAND_GEN_PROCS 15
-#define LOAD_PROCESSES_FROM_FILE 0
-#define IS_ROUND_ROBIN 0
-
 //#define EXECUTION_CONDITION (sharedResource->time < 300)
-#define EXECUTION_CONDITION (sharedResource->doneQSize != MAX_RAND_GEN_PROCS)
+//#define EXECUTION_CONDITION (sharedResource->doneQSize != MAX_RAND_GEN_PROCS)
+#define EXECUTION_CONDITION (sharedResource->doneQSize != sharedResource->properties->maxRandGenProcs)
 
+
+/*
+#define MAX_RAND_GEN_PROCS 15
+#define IS_ROUND_ROBIN 0
 #define NUM_OF_MEM 256
 #define PROBABILITY_INTERACTIVE 0.5
 #define TIME_TO_SLEEP 100000
+*/
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 
 pthread_mutex_t lock;
+
+enum scheduler {
+    FIFO = 0,
+    ROUND_ROBIN = 1,
+    PRIORITY_SCHEDULER = 2
+};
+
+typedef struct systemProperties {
+    unsigned int timeToSleep;
+    int numMemoryBlocks;
+    float probabilityInteractive;
+    int maxRandGenProcs;
+    int scheduler;
+    int maxPriority;
+    float interactiveThreshold;
+} systemProperties;
 
 typedef struct resources{
     int nextPid;
@@ -43,13 +61,14 @@ typedef struct resources{
     int startDataSize;
     int numOfRandGenProcs;
     pagePointer *freeMemoryArray;
+    systemProperties *properties;
 }sharedRes;
 
 
 /*debug method*/
 void printMemoryTable(sharedRes *sharedResource){
     
-    for (int i = 0; i < ((int)ceil(log2(NUM_OF_MEM))) + 1; i++) {
+    for (int i = 0; i < ((int)ceil(log2(sharedResource->properties->numMemoryBlocks))) + 1; i++) {
         page *page = sharedResource->freeMemoryArray[i];
         printPages(page, i);
     }
@@ -92,11 +111,11 @@ int allocate(sharedRes *sharedResource, process *proc){
         printMemoryTable(sharedResource);
     
     page *contigiousPages = sharedResource->freeMemoryArray[index];
-    while (index < (ceil(log2(NUM_OF_MEM)) + 1) && contigiousPages->next == contigiousPages && contigiousPages->prev == contigiousPages) {
+    while (index < (ceil(log2(sharedResource->properties->numMemoryBlocks)) + 1) && contigiousPages->next == contigiousPages && contigiousPages->prev == contigiousPages) {
         index++;
         contigiousPages = sharedResource->freeMemoryArray[index];
     }
-    if (index == (ceil(log2(NUM_OF_MEM)) + 1)) {
+    if (index == (ceil(log2(sharedResource->properties->numMemoryBlocks)) + 1)) {
         proc->hasBeenAllocatedMemory = 0;
         return 0;
     }
@@ -189,13 +208,13 @@ process *generateRandomProcess(double probability, int minRunTime, int maxRunTim
         newProc->runTime = runTime;
         newProc->runTimeRemaining = runTime;
         // Randomly choose if we want an interactive process.
-        newProc->probSystemCall = generateProbabilityOfSystemCall(PROBABILITY_INTERACTIVE);
-        newProc->priority = rand() % MAX_PRIORITY;
+        newProc->probSystemCall = generateProbabilityOfSystemCall(sharedResource->properties->probabilityInteractive);
+        newProc->priority = rand() % sharedResource->properties->maxPriority;
         newProc->timeEnteredReadyQ = -1;
-        if (IS_ROUND_ROBIN)
+        if (sharedResource->properties->scheduler == ROUND_ROBIN)
             newProc->timeSlice = 4;
         else
-            newProc->timeSlice = (MAX_PRIORITY - newProc->priority) * 2;
+            newProc->timeSlice = (sharedResource->properties->maxPriority - newProc->priority) * 2;
         newProc->requiredMemoryPages = generateRandomNumberOfMemoryPages();
         newProc->hasBeenAllocatedMemory = 0;
         newProc->printedNotEnoughMem = 0;
@@ -252,10 +271,10 @@ void *cpu(void *arg){
                         // otherwise it doesn't mean much.
                         if (currentProcess->timeAllotted > 5) {
                             double systemCallRatio = (double)currentProcess->timeSystemCall / currentProcess->timeAllotted;
-                            if (!currentProcess->isInteractive && systemCallRatio > INTERACTIVE_THRESHOLD) {
+                            if (!currentProcess->isInteractive && systemCallRatio > sharedResource->properties->interactiveThreshold) {
                                 currentProcess->isInteractive = true;
                                 printf("pId %d flagged as interactive\n", currentProcess->pID);
-                            } else if (currentProcess->isInteractive && systemCallRatio <= INTERACTIVE_THRESHOLD) {
+                            } else if (currentProcess->isInteractive && systemCallRatio <= sharedResource->properties->interactiveThreshold) {
                                 currentProcess->isInteractive = false;
                                 printf("pId %d interactive flag removed\n", currentProcess->pID);
                             }
@@ -315,83 +334,42 @@ void *cpuClock(void *arg){
         pthread_mutex_lock(&lock);
         sharedResource->time++;
         pthread_mutex_unlock(&lock);
-        if (!LOAD_PROCESSES_FROM_FILE) {
-            // On every tick, randomly choose whether or not to create a process.
-            process *proc = generateRandomProcess(0.3, 3, 100, sharedResource);//->time);
-            if (proc != NULL && sharedResource->numOfRandGenProcs > 0) {
-                printf("\nScheduling process pID: %d entryTime: %d runTime: %d pages: %d \n", proc->pID, proc->entryTime, proc->runTime, proc->requiredMemoryPages);
-                synchronizedSchedule(sharedResource, proc);
-                sharedResource->numOfRandGenProcs--;
-            }
+        // On every tick, randomly choose whether or not to create a process.
+        process *proc = generateRandomProcess(0.3, 3, 100, sharedResource);//->time);
+        if (proc != NULL && sharedResource->numOfRandGenProcs > 0) {
+            printf("\nScheduling process pID: %d entryTime: %d runTime: %d pages: %d \n", proc->pID, proc->entryTime, proc->runTime, proc->requiredMemoryPages);
+            synchronizedSchedule(sharedResource, proc);
+            sharedResource->numOfRandGenProcs--;
         }
-        usleep(TIME_TO_SLEEP);
+        usleep(sharedResource->properties->timeToSleep);
     }
     pthread_exit(NULL);
 }
 
-//problem in this method initdata being null
-void *scheduleInitialData(void *arg) {
-    sharedRes *sharedResource = (sharedRes *) arg;
-    circularlistnode *initData = sharedResource->startData;
-    while (sharedResource->startDataSize > 0) {
-        if (initData != NULL && initData != sharedResource->startData && initData->current && initData->current->entryTime <= sharedResource->time) {
-            synchronizedSchedule(sharedResource, initData->current);
-            del(sharedResource->startData, initData->current->pID);
-            sharedResource->startDataSize--;
-            printf("Added pID: %d to the ReadyQ \n", (initData->current)->pID);
-        }
-        if (initData != NULL && initData->next != NULL)
-            initData = initData->next;
-        else
-            initData = sharedResource->startData;
-    }
-    //if (initData != NULL && initData->next != NULL)
-        //initData = initData->next;
-
-    //print(sharedResource->readyQstart, (sharedResource->readyQstart)->next);
-    pthread_exit(NULL);
-}
-
-void loadProcessesFromFile(char *fileName, sharedRes *sharedResource) {
-    circularlistnode *start = sharedResource->startData;
-    
+systemProperties *loadPropertiesFromFile(const char *fileName) {
     FILE *fp;
-    char buff[255];
-    fp=fopen(fileName, "r");
-    int i = 0;
-    process *newProc = NULL;
-    while (fscanf(fp, "%s", buff) != EOF) {
-        if (i % 3 == 0)
-        {
-            newProc = (process *) malloc(sizeof(process));
-            newProc->pID = atoi(buff);
-        }
-        else if (i % 3 == 1)
-        {
-            newProc->entryTime = atoi(buff);
-        }
-        else
-        {
-            newProc->runTime = atoi(buff);
-            newProc->probSystemCall = .1; //give every process the same chance of generating a system call for now but should be random
-            newProc->requiredMemoryPages = generateRandomNumberOfMemoryPages();
-            newProc->hasBeenAllocatedMemory = 0;
-            insertBack(start, newProc);
-            sharedResource->startDataSize++;
-        }
-        i++;
-    }
-
-    print(start, start->next);
-    printf("\n=================================\n");
-    sharedResource->startData = start;
+    fp = fopen(fileName, "r");
+    if (fp == NULL)
+        return NULL;
+    
+    char c[255];
+    systemProperties *properties = (systemProperties*)malloc(sizeof(systemProperties));
+    fscanf(fp, "%d", &properties->timeToSleep); fscanf(fp, "%s", c);
+    fscanf(fp, "%d", &properties->numMemoryBlocks); fscanf(fp, "%s", c);
+    fscanf(fp, "%f", &properties->probabilityInteractive); fscanf(fp, "%s", c);
+    fscanf(fp, "%d", &properties->maxRandGenProcs); fscanf(fp, "%s", c);
+    fscanf(fp, "%d", &properties->scheduler); fscanf(fp, "%s", c);
+    fscanf(fp, "%d", &properties->maxPriority); fscanf(fp, "%s", c);
+    fscanf(fp, "%f", &properties->interactiveThreshold);
+    fclose(fp);
+    
+    return properties;
 }
 
 
 int main(int argc, const char * argv[]) {
     int rc;
     pthread_t clockThread;
-    pthread_t readyQThread;
     pthread_t cpuThread;
     
     circularlistnode *doneQ;
@@ -409,13 +387,30 @@ int main(int argc, const char * argv[]) {
     waitQ -> next = waitQ;
     waitQ -> prev = waitQ;
     
+    sharedRes *sharedResource = (sharedRes *) malloc(sizeof(sharedRes));
+    sharedResource->time = 0;
+    sharedResource->startDataSize = 0;
+    sharedResource->doneQ = doneQ;
+    sharedResource->doneQSize = 0;
+    sharedResource->startData = start;
+    sharedResource->nextPid = 0;
+    sharedResource->waitQ = waitQ;
+    sharedResource->properties = loadPropertiesFromFile(argv[1]);
+    if (sharedResource->properties == NULL)
+    {
+        printf("Unable to read system properties. Cannot run simulation.\n");
+        return 1;
+    }
+    sharedResource->numOfRandGenProcs = sharedResource->properties->maxRandGenProcs;
+    
     priorityscheduler *scheduler = (priorityscheduler *)malloc(sizeof(priorityscheduler));
-    pr_init_scheduler(scheduler);
-    
+    pr_init_scheduler(scheduler, sharedResource->properties->maxPriority);
+    sharedResource->scheduler = scheduler;
+
     //int size = (int)ceil(log2(NUM_OF_MEM));
-    pagePointer freeMemTable[((int)ceil(log2(NUM_OF_MEM))) + 1];
+    pagePointer freeMemTable[((int)ceil(log2(sharedResource->properties->numMemoryBlocks))) + 1];
     
-    for (int i = 0; i < ((int)ceil(log2(NUM_OF_MEM))) + 1; i++) {
+    for (int i = 0; i < ((int)ceil(log2(sharedResource->properties->numMemoryBlocks))) + 1; i++) {
         page *start = (page *) malloc(sizeof(page));
         start->next = start;
         start->prev = start;
@@ -424,23 +419,13 @@ int main(int argc, const char * argv[]) {
     
     page *firstPage = (page *)malloc(sizeof(page));
     firstPage->startAddress = 0;
-    firstPage->size = NUM_OF_MEM;
+    firstPage->size = sharedResource->properties->numMemoryBlocks;
 
-    freeMemTable[((int)log2(NUM_OF_MEM))]->next = firstPage;
-    freeMemTable[((int)log2(NUM_OF_MEM))]->prev = firstPage;
-    firstPage->next = freeMemTable[((int)log2(NUM_OF_MEM))];
-    firstPage->prev = freeMemTable[((int)log2(NUM_OF_MEM))];
+    freeMemTable[((int)log2(sharedResource->properties->numMemoryBlocks))]->next = firstPage;
+    freeMemTable[((int)log2(sharedResource->properties->numMemoryBlocks))]->prev = firstPage;
+    firstPage->next = freeMemTable[((int)log2(sharedResource->properties->numMemoryBlocks))];
+    firstPage->prev = freeMemTable[((int)log2(sharedResource->properties->numMemoryBlocks))];
     
-    sharedRes *sharedResource = (sharedRes *) malloc(sizeof(sharedRes));
-    sharedResource->scheduler = scheduler;
-    sharedResource->time = 0;
-    sharedResource->startDataSize = 0;
-    sharedResource->doneQ = doneQ;
-    sharedResource->doneQSize = 0;
-    sharedResource->startData = start;
-    sharedResource->nextPid = 0;
-    sharedResource->waitQ = waitQ;
-    sharedResource->numOfRandGenProcs = MAX_RAND_GEN_PROCS;
     sharedResource->freeMemoryArray = freeMemTable;
     
     //NOTE Ready to start generating the number of pages a process needs to execute and figure out hw to give it to them.
@@ -450,23 +435,11 @@ int main(int argc, const char * argv[]) {
     // Seed the random function.
     srand((unsigned int)time(NULL));
 
-    if (LOAD_PROCESSES_FROM_FILE)
-        loadProcessesFromFile("/Users/Sean/Documents/College/Spring 2016/Advanced OS/OSSimulator/OSSimulator/dataFile.txt", sharedResource);
-        //loadProcessesFromFile("/Users/cvrahimis/Documents/CSAdvOS/CProjects/OSSimulator/OSSimulator/dataFile.txt", sharedResource);
-    
     rc = pthread_create(&clockThread, NULL, cpuClock, (void *)sharedResource);
     if(rc)
     {
         printf("ERROR. Return code from thread %d\n", rc);
         exit(-1);
-    }
-    if (LOAD_PROCESSES_FROM_FILE) {
-        rc = pthread_create(&readyQThread, NULL, scheduleInitialData, (void *)sharedResource);
-        if(rc)
-        {
-            printf("ERROR. Return code from thread %d\n", rc);
-            exit(-1);
-        }
     }
 
     rc = pthread_create(&cpuThread, NULL, cpu, (void *)sharedResource);
@@ -482,14 +455,6 @@ int main(int argc, const char * argv[]) {
         printf("Error, return code from thread_join() is %d\n", rc);
         exit(-1);
     }
-    if (LOAD_PROCESSES_FROM_FILE) {
-        rc = pthread_join(readyQThread, NULL);
-        if(rc)
-        {
-            printf("Error, return code from thread_join() is %d\n", rc);
-            exit(-1);
-        }
-    }
     rc = pthread_join(cpuThread, NULL);
     if(rc)
     {
@@ -501,8 +466,6 @@ int main(int argc, const char * argv[]) {
     printf("main completed join with thread cpu thread \n");
     
     printData(sharedResource->doneQ, sharedResource->doneQ->next);
-    
-    int fclose(FILE *fp);
     
     pthread_mutex_destroy(&lock);
     return 0;

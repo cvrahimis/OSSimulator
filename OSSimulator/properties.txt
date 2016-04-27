@@ -1,0 +1,7 @@
+100000 timeToSleep
+256 numMemoryBlocks
+0.5 probabilityInteractive
+15 maxRandGenProc
+2 scheduler
+5 maxPriority
+0.5 interactiveThreshold

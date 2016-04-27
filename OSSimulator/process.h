@@ -10,7 +10,6 @@
 #define process_h
 
 #include <stdbool.h>
-#define INTERACTIVE_THRESHOLD 0.5
 
 typedef struct Process
 {

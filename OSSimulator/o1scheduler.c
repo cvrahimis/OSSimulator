@@ -9,17 +9,18 @@
 #include "o1scheduler.h"
 #include <stdlib.h>
 
-void o1_init_scheduler(o1scheduler *scheduler)
+void o1_init_scheduler(o1scheduler *scheduler, int maxPriority)
 {
+    scheduler->maxPriority = maxPriority;
     scheduler->readyQueueSize = 0;
     
     scheduler->activeQueueBitMap  = 0;
     scheduler->expiredQueueBitMap = 0;
     
-    scheduler->activeProcessQueue  = (circularlistnode**)malloc(sizeof(circularlistnode*)*MAX_PRIORITY);
-    scheduler->expiredProcessQueue = (circularlistnode**)malloc(sizeof(circularlistnode*)*MAX_PRIORITY);
+    scheduler->activeProcessQueue  = (circularlistnode**)malloc(sizeof(circularlistnode*)*maxPriority);
+    scheduler->expiredProcessQueue = (circularlistnode**)malloc(sizeof(circularlistnode*)*maxPriority);
     
-    for (int i = 0; i < MAX_PRIORITY; i++)
+    for (int i = 0; i < maxPriority; i++)
     {
         scheduler->activeProcessQueue[i] = (circularlistnode*)malloc(sizeof(circularlistnode));
         scheduler->activeProcessQueue[i]->next = scheduler->activeProcessQueue[i];
@@ -49,7 +50,7 @@ process *o1_nextProcess(o1scheduler *scheduler)
     
     // Run through all the active queues and get the first
     // process from the lowest priority queue.
-    for (int i = 0; i < MAX_PRIORITY; i++)
+    for (int i = 0; i < scheduler->maxPriority; i++)
     {
         if (scheduler->activeProcessQueue[i]->next->current)
         {

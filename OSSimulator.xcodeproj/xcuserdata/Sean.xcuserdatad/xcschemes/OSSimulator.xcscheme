@@ -61,6 +61,12 @@
             ReferencedContainer = "container:OSSimulator.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
+      <CommandLineArguments>
+         <CommandLineArgument
+            argument = "&quot;/Users/Sean/Documents/College/Spring 2016/Advanced OS/OSSimulator/OSSimulator/properties.txt&quot;"
+            isEnabled = "YES">
+         </CommandLineArgument>
+      </CommandLineArguments>
       <AdditionalOptions>
       </AdditionalOptions>
    </LaunchAction>
